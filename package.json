@@ -1,0 +1,11 @@
+{
+  "name": "learnloop",
+  "private": true,
+  "workplaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspaces"
+  }
+}
