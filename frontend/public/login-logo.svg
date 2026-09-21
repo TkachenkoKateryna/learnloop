@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" aria-hidden="true">
+  <defs>
+    <clipPath id="login-logo-flag">
+      <path d="M8 8h48v20L32 44 8 28V8z" />
+    </clipPath>
+  </defs>
+  <path d="M8 8h48v20L32 44 8 28V8z" fill="orange" />
+  <g clipPath="url(#login-logo-flag)">
+    <path d="M6 2l20 44M22 2l20 44" stroke="#fff" strokeWidth="6" />
+  </g>
+</svg>

@@ -1,0 +1,36 @@
+.page {
+  width: 100%;
+  max-width: 64rem;
+  overflow: hidden;
+  border-radius: 1rem;
+  background-color: oklch(27.8% 0.033 256.848 / 50%);
+  box-shadow:
+    0 20px 25px -5px rgb(0 0 0 / 0.1),
+    0 8px 10px -6px rgb(0 0 0 / 0.1);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  padding: 2rem;
+}
+
+.title {
+  margin-bottom: 1.5rem;
+  background-image: linear-gradient(
+    to right in oklab,
+    oklch(79.2% 0.209 151.711),
+    oklch(69.6% 0.17 162.48)
+  );
+  background-clip: text;
+  -webkit-background-clip: text;
+  font-size: 1.875rem;
+  line-height: 1.2;
+  font-weight: 700;
+  color: transparent;
+}
+
+.status {
+  color: oklch(70.7% 0.022 261.325);
+}
+
+.error {
+  color: oklch(70.4% 0.191 22.216);
+}

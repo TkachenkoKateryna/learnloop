@@ -1,0 +1,50 @@
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.headerCell {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid oklch(37.3% 0.034 259.733);
+  text-align: left;
+  font-weight: 700;
+  color: oklch(70.7% 0.022 261.325);
+}
+
+.row {
+  transition: background-color 150ms ease;
+}
+
+@media (hover: hover) {
+  .row:hover {
+    background-color: oklch(27.8% 0.033 256.848 / 50%);
+  }
+}
+
+.cell {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid oklch(37.3% 0.034 259.733 / 50%);
+  color: #fff;
+}
+
+.deleteButton {
+  border: none;
+  border-radius: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  background-color: transparent;
+  color: oklch(70.4% 0.191 22.216);
+  font-weight: 700;
+}
+
+@media (hover: hover) {
+  .deleteButton:hover {
+    background-color: oklch(63.7% 0.237 25.331 / 15%);
+  }
+}
+
+.empty {
+  padding: 1.5rem 0;
+  text-align: center;
+  color: oklch(70.7% 0.022 261.325);
+}

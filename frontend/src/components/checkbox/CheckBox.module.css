@@ -1,0 +1,37 @@
+.checkboxField {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.checkboxField p {
+  margin: 0;
+}
+
+.checkbox {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  background: white;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkbox:checked {
+  border-color: orange;
+  box-shadow: 0 0 0 3px rgba(255, 165, 0, 0.3);
+}
+
+.checkbox:checked::after {
+  content: '';
+  width: 5px;
+  height: 9px;
+  border: solid orange;
+  border-width: 0 3px 3px 0;
+  transform: rotate(45deg) translateY(-1px);
+}
