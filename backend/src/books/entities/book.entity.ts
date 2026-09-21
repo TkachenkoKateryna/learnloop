@@ -6,7 +6,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { BookLanguage } from '../enums/book-language.enum';
-import { Publisher } from 'src/publishers/entities/publisher.entity';
+import { Publisher } from '../../publishers/entities/publisher.entity';
 
 @Entity()
 export class Book {

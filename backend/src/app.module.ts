@@ -2,21 +2,23 @@ import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { appConfig } from './config/app.config';
 import { appConfigSchema, ConfigType } from './config/config.types';
 import { typeOrmConfig } from './config/database.config';
+import { authConfig } from './config/auth.config';
 import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { BooksModule } from './books/books.module';
 import { Book } from './books/entities/book.entity';
 import { UsersModule } from './users/users.module';
 import { PublishersModule } from './publishers/publishers.module';
 import { User } from './users/entities/user.entity';
+import { Session } from './users/entities/session.entity';
 import { Publisher } from './publishers/entities/publisher.entity';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
-      load: [appConfig, typeOrmConfig],
+      isGlobal: true,
+      load: [typeOrmConfig, authConfig],
       validationSchema: appConfigSchema,
       validationOptions: {
         abortEarly: true,
@@ -27,7 +29,7 @@ import { Publisher } from './publishers/entities/publisher.entity';
       inject: [ConfigService],
       useFactory: (configService: ConfigService<ConfigType>) => ({
         ...configService.get<TypeOrmModuleOptions>('database'),
-        entities: [Book, User, Publisher],
+        entities: [Book, User, Publisher, Session],
       }),
     }),
     BooksModule,
