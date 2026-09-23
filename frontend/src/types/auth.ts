@@ -15,6 +15,15 @@ export interface LoginResponse {
   accessToken: string;
 }
 
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ResetPasswordRequest {
+  token: string;
+  newPassword: string;
+}
+
 export interface User {
   id: string;
   firstName: string;

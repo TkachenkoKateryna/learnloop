@@ -13,6 +13,8 @@ import { User } from '../entities/user.entity';
 import { PasswordService } from '../password/password.service';
 import { AuthConfig, ConfigType } from '../../config/config.types';
 import { SessionService } from '../session/session.service';
+import { PasswordResetService } from '../password-reset/password-reset.service';
+import { MailService } from '../../mail/mail.service';
 import { LoginDto } from '../dto/login.dto';
 import { RefreshTokenLifetime } from '../interfaces/refresh-token';
 import { JWTPayload } from '../interfaces/jwt-payload';
@@ -26,15 +28,20 @@ export interface AuthTokens {
 @Injectable()
 export class AuthService {
   private readonly jwtConfig: AuthConfig['jwt'];
+  private readonly passwordResetConfig: AuthConfig['passwordReset'];
 
   constructor(
     private readonly userService: UserService,
     private readonly jwtService: JwtService,
     private readonly sessionService: SessionService,
     private readonly passwordService: PasswordService,
+    private readonly passwordResetService: PasswordResetService,
+    private readonly mailService: MailService,
     configService: ConfigService<ConfigType>,
   ) {
-    this.jwtConfig = configService.getOrThrow<AuthConfig>('auth').jwt;
+    const authConfig = configService.getOrThrow<AuthConfig>('auth');
+    this.jwtConfig = authConfig.jwt;
+    this.passwordResetConfig = authConfig.passwordReset;
   }
 
   public async register(createUserDto: CreateUserDto): Promise<User> {
@@ -87,6 +94,35 @@ export class AuthService {
     });
 
     return { ...tokens, refreshTokenCookieMaxAge: cookieMaxAge };
+  }
+
+  // Always resolves the same way whether or not the email is registered,
+  // so callers can't use this endpoint to enumerate accounts.
+  public async forgotPassword(email: string): Promise<void> {
+    const user = await this.userService.findOneByEmail(email);
+
+    if (!user) {
+      return;
+    }
+
+    const token = await this.passwordResetService.createToken(user.id);
+    const resetUrl = `${this.passwordResetConfig.resetUrl}?token=${token}`;
+
+    await this.mailService.sendPasswordResetEmail(user.email, resetUrl);
+  }
+
+  public async resetPassword(
+    token: string,
+    newPassword: string,
+  ): Promise<void> {
+    const userId = await this.passwordResetService.consumeToken(token);
+
+    if (!userId) {
+      throw new UnauthorizedException('Invalid or expired token');
+    }
+
+    await this.userService.updatePassword(userId, newPassword);
+    await this.sessionService.revokeAllForUser(userId);
   }
 
   public async refresh(refreshToken: string | undefined): Promise<AuthTokens> {

@@ -10,11 +10,22 @@ export interface AuthConfig {
     refreshTokenExpiresIn: StringValue;
     refreshTokenRememberMeExpiresIn: StringValue;
   };
+  passwordReset: {
+    tokenExpiresIn: StringValue;
+    resetUrl: string;
+  };
+}
+
+export interface MailConfig {
+  sendgridApiKey: string;
+  fromEmail: string;
+  fromName: string;
 }
 
 export interface ConfigType {
   database: TypeOrmModuleOptions;
   auth: AuthConfig;
+  mail: MailConfig;
 }
 
 export const appConfigSchema = Joi.object({
@@ -29,4 +40,9 @@ export const appConfigSchema = Joi.object({
   JWT_REFRESH_SECRET: Joi.string().required(),
   JWT_REFRESH_EXPIRES_IN: Joi.string().required(),
   JWT_REFRESH_REMEMBER_ME_EXPIRES_IN: Joi.string().required(),
+  PASSWORD_RESET_TOKEN_EXPIRES_IN: Joi.string().default('30m'),
+  PASSWORD_RESET_URL: Joi.string().uri().required(),
+  SENDGRID_API_KEY: Joi.string().required(),
+  MAIL_FROM_EMAIL: Joi.string().email().required(),
+  MAIL_FROM_NAME: Joi.string().default('LearnLoop'),
 });

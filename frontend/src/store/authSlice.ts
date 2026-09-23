@@ -1,6 +1,12 @@
 import { createAsyncThunk, createSlice, isAnyOf } from '@reduxjs/toolkit';
 import { authService } from '../services/authService';
-import type { LoginRequest, RegisterRequest, User } from '../types/auth';
+import type {
+  ForgotPasswordRequest,
+  LoginRequest,
+  RegisterRequest,
+  ResetPasswordRequest,
+  User,
+} from '../types/auth';
 import { getErrorMessage } from '../utils/getErrorMessage';
 
 interface AuthState {
@@ -40,6 +46,37 @@ export const register = createAsyncThunk<
     return await authService.register(payload);
   } catch (error) {
     return rejectWithValue(getErrorMessage(error, 'Failed to register.'));
+  }
+});
+
+export const forgotPassword = createAsyncThunk<
+  void,
+  ForgotPasswordRequest,
+  { rejectValue: string }
+>('auth/forgotPassword', async (payload, { rejectWithValue }) => {
+  try {
+    await authService.forgotPassword(payload);
+  } catch (error) {
+    return rejectWithValue(
+      getErrorMessage(error, 'Failed to send the reset email.'),
+    );
+  }
+});
+
+export const resetPassword = createAsyncThunk<
+  void,
+  ResetPasswordRequest,
+  { rejectValue: string }
+>('auth/resetPassword', async (payload, { rejectWithValue }) => {
+  try {
+    await authService.resetPassword(payload);
+  } catch (error) {
+    return rejectWithValue(
+      getErrorMessage(
+        error,
+        'This reset link is invalid or has expired. Please request a new one.',
+      ),
+    );
   }
 });
 
@@ -96,6 +133,32 @@ const authSlice = createSlice({
         state.status = 'failed';
         state.error =
           action.payload ?? action.error.message ?? 'Failed to register.';
+      })
+      .addCase(forgotPassword.pending, (state) => {
+        state.status = 'loading';
+        state.error = null;
+      })
+      .addCase(forgotPassword.fulfilled, (state) => {
+        state.status = 'succeeded';
+      })
+      .addCase(forgotPassword.rejected, (state, action) => {
+        state.status = 'failed';
+        state.error =
+          action.payload ??
+          action.error.message ??
+          'Failed to send the reset email.';
+      })
+      .addCase(resetPassword.pending, (state) => {
+        state.status = 'loading';
+        state.error = null;
+      })
+      .addCase(resetPassword.fulfilled, (state) => {
+        state.status = 'succeeded';
+      })
+      .addCase(resetPassword.rejected, (state, action) => {
+        state.status = 'failed';
+        state.error =
+          action.payload ?? action.error.message ?? 'Failed to reset password.';
       })
       .addCase(refreshSession.fulfilled, (state, action) => {
         state.accessToken = action.payload.accessToken;

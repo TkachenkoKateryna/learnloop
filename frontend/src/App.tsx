@@ -3,6 +3,8 @@ import { Route, Routes } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import SignUpPage from './pages/signup/SignUpPage';
 import LoginPage from './pages/login/LoginPage';
+import ForgotPasswordPage from './pages/forgot-password/ForgotPasswordPage';
+import ResetPasswordPage from './pages/reset-password/ResetPasswordPage';
 import BookAdminPage from './pages/books/BookAdminPage';
 import RequireAuth from './components/RequireAuth';
 import GuestOnly from './components/GuestOnly';
@@ -34,6 +36,8 @@ function App() {
         <Route element={<GuestOnly />}>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignUpPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
         </Route>
         <Route element={<RequireAuth />}>
           <Route element={<AppLayout />}>

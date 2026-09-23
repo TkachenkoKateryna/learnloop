@@ -1,8 +1,10 @@
 import { api } from '../adapters/api';
 import type {
+  ForgotPasswordRequest,
   LoginRequest,
   LoginResponse,
   RegisterRequest,
+  ResetPasswordRequest,
   User,
 } from '../types/auth';
 
@@ -31,6 +33,14 @@ export class AuthService {
 
   profile(): Promise<User> {
     return api.get<User>(`${basePath}/profile`);
+  }
+
+  forgotPassword(payload: ForgotPasswordRequest): Promise<void> {
+    return api.post<void>(`${basePath}/forgot-password`, payload);
+  }
+
+  resetPassword(payload: ResetPasswordRequest): Promise<void> {
+    return api.post<void>(`${basePath}/reset-password`, payload);
   }
 
   private startSession(

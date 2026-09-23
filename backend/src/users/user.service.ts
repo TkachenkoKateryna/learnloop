@@ -32,4 +32,10 @@ export class UserService {
   public async findOne(id: string): Promise<User | null> {
     return await this.userRepository.findOneBy({ id });
   }
+
+  public async updatePassword(id: string, password: string): Promise<void> {
+    const hashedPassword = await this.passwordService.hash(password);
+
+    await this.userRepository.update(id, { password: hashedPassword });
+  }
 }
