@@ -2,11 +2,23 @@ import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { createHash } from 'crypto';
+import { FindOperator } from 'typeorm';
 import { PasswordResetService } from './password-reset.service';
 import { PasswordResetToken } from '../entities/password-reset-token.entity';
 
 const sha256 = (value: string) =>
   createHash('sha256').update(value).digest('hex');
+
+const matches = (actual: unknown, expected: unknown): boolean => {
+  if (expected instanceof FindOperator) {
+    if (expected.type === 'isNull') return actual === null;
+    if (expected.type === 'moreThan') {
+      return (actual as Date) > (expected.value as Date);
+    }
+    throw new Error(`Unsupported operator in mock: ${expected.type}`);
+  }
+  return actual === expected;
+};
 
 describe('PasswordResetService', () => {
   let service: PasswordResetService;
@@ -33,10 +45,20 @@ describe('PasswordResetService', () => {
           [...tokens.values()].find((t) => t.tokenHash === tokenHash) ?? null,
         ),
       ),
-      update: jest.fn((id: string, data: Partial<PasswordResetToken>) => {
-        Object.assign(tokens.get(id)!, data);
-        return Promise.resolve();
-      }),
+      update: jest.fn(
+        (
+          criteria: Record<string, unknown>,
+          data: Partial<PasswordResetToken>,
+        ) => {
+          const matching = [...tokens.values()].filter((token) =>
+            Object.entries(criteria).every(([key, expected]) =>
+              matches(token[key as keyof PasswordResetToken], expected),
+            ),
+          );
+          matching.forEach((token) => Object.assign(token, data));
+          return Promise.resolve({ affected: matching.length });
+        },
+      ),
     };
 
     const module = await Test.createTestingModule({
@@ -106,6 +128,32 @@ describe('PasswordResetService', () => {
       onlyToken().expiresAt = new Date(Date.now() - 1000);
 
       await expect(service.consumeToken(token)).resolves.toBe(null);
+    });
+
+    it('lets only one of two concurrent requests use the same token', async () => {
+      const token = await service.createToken('user-1');
+
+      const results = await Promise.all([
+        service.consumeToken(token),
+        service.consumeToken(token),
+      ]);
+
+      expect(results.filter((userId) => userId === 'user-1')).toHaveLength(1);
+      expect(results).toContain(null);
+    });
+  });
+
+  describe('revokeAllForUser', () => {
+    it("invalidates every unused token of the user and no one else's", async () => {
+      const first = await service.createToken('user-1');
+      const second = await service.createToken('user-1');
+      const otherUsers = await service.createToken('user-2');
+
+      await service.revokeAllForUser('user-1');
+
+      await expect(service.consumeToken(first)).resolves.toBe(null);
+      await expect(service.consumeToken(second)).resolves.toBe(null);
+      await expect(service.consumeToken(otherUsers)).resolves.toBe('user-2');
     });
   });
 });

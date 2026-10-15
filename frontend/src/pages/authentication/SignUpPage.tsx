@@ -1,13 +1,15 @@
-import { useEffect, useState, type ChangeEvent, type SubmitEvent } from 'react';
+import { useState, type ChangeEvent, type SubmitEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
 import { Eye, EyeOff } from 'lucide-react';
-import Input from '../../components/input/Input';
+import Input from '../../components/ui/input/Input';
 import styles from './SignUpPage.module.css';
-import PasswordStrengthMeter from './components/PasswordStrengthMeter';
-import { isPasswordValid } from './passwordRules';
-import { clearError, register } from '../../store';
-import type { AppDispatch, RootState } from '../../store';
+import {
+  authService,
+  isPasswordValid,
+  PasswordStrengthMeter,
+  type RegisterRequest,
+} from '../../features/authentication';
+import { useAsyncAction } from '../../hooks/useAsyncAction';
 
 const SignUpPage = () => {
   const [firstName, setFirstName] = useState('');
@@ -16,10 +18,15 @@ const SignUpPage = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
-  const { status, error } = useSelector((state: RootState) => state.auth);
-  const isSubmitting = status === 'loading';
+  const {
+    run: submitSignup,
+    isPending: isSubmitting,
+    error,
+  } = useAsyncAction(
+    (payload: RegisterRequest) => authService.register(payload),
+    'Failed to register.',
+  );
   const canSubmit =
     firstName.trim() !== '' &&
     lastName.trim() !== '' &&
@@ -27,23 +34,17 @@ const SignUpPage = () => {
     isPasswordValid(password) &&
     !isSubmitting;
 
-  useEffect(() => {
-    dispatch(clearError());
-  }, [dispatch]);
-
   const handleSignup = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const result = await dispatch(
-      register({
-        email: email.trim(),
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        password,
-      }),
-    );
+    const succeeded = await submitSignup({
+      email: email.trim(),
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      password,
+    });
 
-    if (register.fulfilled.match(result)) {
+    if (succeeded) {
       navigate('/login');
     }
   };

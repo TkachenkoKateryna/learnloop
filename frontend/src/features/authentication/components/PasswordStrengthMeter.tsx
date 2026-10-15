@@ -4,7 +4,7 @@ import {
   MIN_PASSWORD_LENGTH,
   hasMinLength,
   hasUppercase,
-} from '../passwordRules';
+} from '../utils/passwordRules';
 
 interface PasswordCriteriaProps {
   password: string;
@@ -53,7 +53,7 @@ const PasswordStrengthMeter = ({ password }: PasswordStrengthMeterProps) => {
   const getStrength = (password: string): number => {
     let strength = 0;
     if (password.length >= 6) strength++;
-    if (password.match(/a-z/)) strength++;
+    if (password.match(/[a-z]/)) strength++;
     if (password.match(/[A-Z]/)) strength++;
     if (password.match(/\d/)) strength++;
     if (password.match(/[^a-zA-Z\d]/)) strength++;

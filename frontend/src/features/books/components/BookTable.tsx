@@ -1,4 +1,4 @@
-import type { Book } from '../../../types/book';
+import type { Book } from '../types/book';
 import styles from './BookTable.module.css';
 
 interface BookTableProps {

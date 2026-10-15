@@ -1,6 +1,7 @@
 import type { AxiosError, InternalAxiosRequestConfig } from 'axios';
-import { api } from './api';
-import { store, refreshSession } from '../store';
+import { api } from '../../../lib/apiClient';
+import { store } from '../../../store';
+import { refreshSession } from '../store/authThunks';
 
 type RetriableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 
@@ -9,15 +10,17 @@ const AUTH_URLS = [
   'auth/register',
   'auth/refresh',
   'auth/logout',
+  'auth/profile',
+  'auth/forgot-password',
+  'auth/reset-password',
 ];
 
-let refreshPromise: Promise<string> | null = null;
+let refreshPromise: Promise<unknown> | null = null;
 
 const refreshAccessToken = () => {
   refreshPromise ??= store
     .dispatch(refreshSession())
     .unwrap()
-    .then(({ accessToken }) => accessToken)
     .finally(() => {
       refreshPromise = null;
     });
@@ -40,11 +43,15 @@ export const setupAuthInterceptor = () => {
     config._retry = true;
 
     try {
-      const accessToken = await refreshAccessToken();
-      config.headers.Authorization = `Bearer ${accessToken}`;
+      await refreshAccessToken();
       return api.retry(config);
-    } catch {
-      api.removeHeader('Authorization');
+    } catch (reason) {
+      // Mirror the slice: drop the token only when the session is really
+      // gone. If the server was unreachable the user stays logged in, and
+      // the next 401 will try the refresh again.
+      if (reason === 'unauthorized') {
+        api.setAccessToken(null);
+      }
       throw error;
     }
   });

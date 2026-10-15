@@ -14,24 +14,32 @@ type ErrorResponseInterceptor = (error: AxiosError) => unknown;
 
 class ApiClient {
   private readonly instance: AxiosInstance;
+  // In memory only - the long-lived refresh token is an httpOnly cookie.
+  private accessToken: string | null = null;
 
   constructor(baseURL: string, config?: AxiosRequestConfig) {
     this.instance = axios.create({
       baseURL,
       withCredentials: true,
+      timeout: 10_000,
       headers: {
         'Content-Type': 'application/json',
       },
       ...config,
     });
+
+    this.instance.interceptors.request.use((request) => {
+      if (this.accessToken) {
+        request.headers.Authorization = `Bearer ${this.accessToken}`;
+      } else {
+        delete request.headers.Authorization;
+      }
+      return request;
+    });
   }
 
-  public setHeader(header: string, value: string): void {
-    this.instance.defaults.headers.common[header] = value;
-  }
-
-  public removeHeader(header: string): void {
-    delete this.instance.defaults.headers.common[header];
+  public setAccessToken(token: string | null): void {
+    this.accessToken = token;
   }
 
   public setErrorResponseInterceptor(onError: ErrorResponseInterceptor): void {

@@ -1,13 +1,18 @@
-import { useEffect, useState, type ChangeEvent, type SubmitEvent } from 'react';
+import { useState, type ChangeEvent, type SubmitEvent } from 'react';
 import { Eye, EyeOff, KeyRound, Mailbox } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
-import Input from '../../components/input/Input';
-import PasswordStrengthMeter from '../signup/components/PasswordStrengthMeter';
-import { isPasswordValid } from '../signup/passwordRules';
+import Input from '../../components/ui/input/Input';
+import {
+  authService,
+  isPasswordValid,
+  logout,
+  PasswordStrengthMeter,
+  selectIsAuthenticated,
+  type ResetPasswordRequest,
+} from '../../features/authentication';
 import styles from './ResetPasswordPage.module.css';
-import { clearError, resetPassword } from '../../store';
-import type { AppDispatch, RootState } from '../../store';
+import { useAsyncAction } from '../../hooks/useAsyncAction';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
 
 const ResetPasswordPage = () => {
   const [searchParams] = useSearchParams();
@@ -19,9 +24,17 @@ const ResetPasswordPage = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [succeeded, setSucceeded] = useState(false);
 
-  const dispatch = useDispatch<AppDispatch>();
-  const { status, error } = useSelector((state: RootState) => state.auth);
-  const isSubmitting = status === 'loading';
+  const dispatch = useAppDispatch();
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
+
+  const {
+    run: submitReset,
+    isPending: isSubmitting,
+    error,
+  } = useAsyncAction(
+    (payload: ResetPasswordRequest) => authService.resetPassword(payload),
+    'This reset link is invalid or has expired. Please request a new one.',
+  );
   const passwordsMismatch =
     confirmPassword !== '' && newPassword !== confirmPassword;
   const canSubmit =
@@ -30,10 +43,6 @@ const ResetPasswordPage = () => {
     newPassword === confirmPassword &&
     !isSubmitting;
 
-  useEffect(() => {
-    dispatch(clearError());
-  }, [dispatch]);
-
   const handleSubmit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -41,9 +50,12 @@ const ResetPasswordPage = () => {
       return;
     }
 
-    const result = await dispatch(resetPassword({ token, newPassword }));
-
-    if (resetPassword.fulfilled.match(result)) {
+    if (await submitReset({ token, newPassword })) {
+      // The server revoked every session of this account, this browser's
+      // included, so a logged-in user has to sign in again.
+      if (isAuthenticated) {
+        await dispatch(logout());
+      }
       setSucceeded(true);
     }
   };

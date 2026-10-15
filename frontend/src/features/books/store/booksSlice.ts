@@ -3,7 +3,7 @@ import {
   createSlice,
   type PayloadAction,
 } from '@reduxjs/toolkit';
-import { getBooks } from '../services/books';
+import { getBooks } from '../api/booksService';
 import type { Book } from '../types/book';
 
 export type { Book };

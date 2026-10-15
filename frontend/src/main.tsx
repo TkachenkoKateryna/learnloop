@@ -6,7 +6,7 @@ import { Provider } from 'react-redux';
 import './index.css';
 import App from './App.tsx';
 import { store } from './store';
-import { setupAuthInterceptor } from './adapters/setupAuthInterceptor';
+import { setupAuthInterceptor } from './features/authentication';
 
 setupAuthInterceptor();
 

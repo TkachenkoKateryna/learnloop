@@ -1,4 +1,4 @@
-import { api } from '../adapters/api';
+import { api } from '../../../lib/apiClient';
 import type { Book } from '../types/book';
 
 const basePath = 'books';

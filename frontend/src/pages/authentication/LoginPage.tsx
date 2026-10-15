@@ -1,32 +1,42 @@
 import { Link } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
 import styles from './LoginPage.module.css';
 import { Eye, EyeOff } from 'lucide-react';
-import Input from '../../components/input/Input';
-import { useEffect, useState, type ChangeEvent, type SubmitEvent } from 'react';
-import CheckBox from '../../components/checkbox/CheckBox';
-import { clearError, login } from '../../store';
-import type { AppDispatch, RootState } from '../../store';
+import Input from '../../components/ui/input/Input';
+import { useState, type ChangeEvent, type SubmitEvent } from 'react';
+import CheckBox from '../../components/ui/checkbox/CheckBox';
+import { login, type LoginRequest } from '../../features/authentication';
+import { useAppDispatch } from '../../store/hooks';
+import { useAsyncAction } from '../../hooks/useAsyncAction';
 
 const LoginPage = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
+  const [formValues, setFormValues] = useState<LoginRequest>({
+    email: '',
+    password: '',
+    rememberMe: false,
+  });
   const [showPassword, setShowPassword] = useState(false);
 
-  const dispatch = useDispatch<AppDispatch>();
-  const { status, error } = useSelector((state: RootState) => state.auth);
-  const isSubmitting = status === 'loading';
+  const dispatch = useAppDispatch();
+  const {
+    run: submitLogin,
+    isPending: isSubmitting,
+    error,
+  } = useAsyncAction(
+    (credentials: LoginRequest) => dispatch(login(credentials)).unwrap(),
+    'Failed to sign in.',
+  );
+  const { email, password, rememberMe } = formValues;
   const canSubmit = email.trim() !== '' && password !== '' && !isSubmitting;
 
-  useEffect(() => {
-    dispatch(clearError());
-  }, [dispatch]);
+  const updateField = <K extends keyof LoginRequest>(
+    field: K,
+    value: LoginRequest[K],
+  ) => setFormValues((prev) => ({ ...prev, [field]: value }));
 
   const handleSubmit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    await dispatch(login({ email: email.trim(), password, rememberMe }));
+    await submitLogin({ ...formValues, email: email.trim() });
   };
 
   return (
@@ -50,7 +60,7 @@ const LoginPage = () => {
             placeholder="yourname@example.com"
             value={email}
             onChange={(event: ChangeEvent<HTMLInputElement>) =>
-              setEmail(event.target.value)
+              updateField('email', event.target.value)
             }
           />
           <Input
@@ -60,7 +70,7 @@ const LoginPage = () => {
             placeholder="Enter your password"
             value={password}
             onChange={(event: ChangeEvent<HTMLInputElement>) =>
-              setPassword(event.target.value)
+              updateField('password', event.target.value)
             }
             endAdornment={
               <button
@@ -77,7 +87,7 @@ const LoginPage = () => {
             <CheckBox
               label="Remember Me"
               checked={rememberMe}
-              onChange={() => setRememberMe((prev) => !prev)}
+              onChange={() => updateField('rememberMe', !rememberMe)}
             />
             <Link to="/forgot-password" className={styles.accentLink}>
               Forgot Password?

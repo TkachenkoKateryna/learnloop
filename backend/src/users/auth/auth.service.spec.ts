@@ -1,4 +1,4 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
@@ -30,12 +30,16 @@ const passwordResetConfig = {
 const sha256 = (value: string) =>
   createHash('sha256').update(value).digest('hex');
 
+const flushBackgroundWork = () =>
+  new Promise((resolve) => setImmediate(resolve));
+
 describe('AuthService', () => {
   let service: AuthService;
   let sessions: Map<string, Session>;
   let passwordResetService: {
     createToken: jest.Mock<Promise<string>, [string]>;
     consumeToken: jest.Mock<Promise<string | null>, [string]>;
+    revokeAllForUser: jest.Mock<Promise<void>, [string]>;
   };
   let mailService: {
     sendPasswordResetEmail: jest.Mock<Promise<void>, [string, string]>;
@@ -118,6 +122,9 @@ describe('AuthService', () => {
       ),
       consumeToken: jest.fn((token: string) =>
         Promise.resolve(token === 'valid-token' ? user.id : null),
+      ),
+      revokeAllForUser: jest.fn<Promise<void>, [string]>(() =>
+        Promise.resolve(),
       ),
     };
 
@@ -236,6 +243,7 @@ describe('AuthService', () => {
   describe('forgotPassword', () => {
     it('creates a reset token and emails a reset link for a known email', async () => {
       await service.forgotPassword(credentials.email);
+      await flushBackgroundWork();
 
       expect(passwordResetService.createToken).toHaveBeenCalledWith('user-1');
       expect(mailService.sendPasswordResetEmail).toHaveBeenCalledWith(
@@ -252,6 +260,34 @@ describe('AuthService', () => {
       expect(passwordResetService.createToken).not.toHaveBeenCalled();
       expect(mailService.sendPasswordResetEmail).not.toHaveBeenCalled();
     });
+
+    it('resolves without waiting for the email, so known emails answer as fast as unknown ones', async () => {
+      mailService.sendPasswordResetEmail.mockReturnValue(new Promise(() => {}));
+
+      await expect(
+        service.forgotPassword(credentials.email),
+      ).resolves.toBeUndefined();
+    });
+
+    it('still resolves and logs the error when the email fails to send', async () => {
+      const logError = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation(() => {});
+      mailService.sendPasswordResetEmail.mockRejectedValue(
+        new Error('SendGrid is down'),
+      );
+
+      await expect(
+        service.forgotPassword(credentials.email),
+      ).resolves.toBeUndefined();
+      await flushBackgroundWork();
+
+      expect(logError).toHaveBeenCalledWith(
+        'Failed to send password reset email',
+        expect.any(Error),
+      );
+      logError.mockRestore();
+    });
   });
 
   describe('resetPassword', () => {
@@ -266,6 +302,9 @@ describe('AuthService', () => {
       expect(userService.updatePassword).toHaveBeenCalledWith(
         'user-1',
         'NewPassword1',
+      );
+      expect(passwordResetService.revokeAllForUser).toHaveBeenCalledWith(
+        'user-1',
       );
       await expect(service.refresh(refreshToken)).rejects.toThrow(
         UnauthorizedException,

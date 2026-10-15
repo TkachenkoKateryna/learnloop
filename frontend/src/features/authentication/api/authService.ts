@@ -1,4 +1,4 @@
-import { api } from '../adapters/api';
+import { api } from '../../../lib/apiClient';
 import type {
   ForgotPasswordRequest,
   LoginRequest,
@@ -11,7 +11,7 @@ import type {
 const basePath = 'auth';
 
 export class AuthService {
-  login(credentials: LoginRequest): Promise<LoginResponse> {
+  login(credentials: LoginRequest): Promise<User> {
     return this.startSession(
       api.post<LoginResponse>(`${basePath}/login`, credentials),
     );
@@ -21,13 +21,13 @@ export class AuthService {
     return api.post<User>(`${basePath}/register`, payload);
   }
 
-  refresh(): Promise<LoginResponse> {
+  refresh(): Promise<User> {
     return this.startSession(api.post<LoginResponse>(`${basePath}/refresh`));
   }
 
   logout(): Promise<void> {
     return api.post<void>(`${basePath}/logout`).finally(() => {
-      api.removeHeader('Authorization');
+      api.setAccessToken(null);
     });
   }
 
@@ -43,13 +43,16 @@ export class AuthService {
     return api.post<void>(`${basePath}/reset-password`, payload);
   }
 
-  private startSession(
-    request: Promise<LoginResponse>,
-  ): Promise<LoginResponse> {
-    return request.then((response) => {
-      api.setHeader('Authorization', `Bearer ${response.accessToken}`);
-      return response;
-    });
+  private async startSession(request: Promise<LoginResponse>): Promise<User> {
+    const { accessToken } = await request;
+    api.setAccessToken(accessToken);
+
+    try {
+      return await this.profile();
+    } catch (error) {
+      api.setAccessToken(null);
+      throw error;
+    }
   }
 }
 

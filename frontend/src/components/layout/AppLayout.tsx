@@ -1,11 +1,10 @@
 import { Outlet } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
-import { logout } from '../../store';
-import type { AppDispatch } from '../../store';
+import { logout } from '../../features/authentication';
+import { useAppDispatch } from '../../store/hooks';
 import styles from './AppLayout.module.css';
 
 const AppLayout = () => {
-  const dispatch = useDispatch<AppDispatch>();
+  const dispatch = useAppDispatch();
 
   return (
     <div className={styles.layout}>

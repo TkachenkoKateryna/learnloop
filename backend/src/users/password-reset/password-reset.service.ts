@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, MoreThan, Repository } from 'typeorm';
 import { createHash, randomBytes } from 'crypto';
 import ms, { StringValue } from 'ms';
 import { ConfigService } from '@nestjs/config';
@@ -37,19 +37,33 @@ export class PasswordResetService {
   // Single-use: returns the token's owner and marks it used, or null if the
   // token is unknown, already used, or expired.
   public async consumeToken(token: string): Promise<string | null> {
+    const tokenHash = this.hashToken(token);
     const resetToken = await this.passwordResetTokenRepository.findOneBy({
-      tokenHash: this.hashToken(token),
+      tokenHash,
     });
 
-    if (!resetToken || resetToken.usedAt || resetToken.expiresAt < new Date()) {
+    if (!resetToken) {
       return null;
     }
 
-    await this.passwordResetTokenRepository.update(resetToken.id, {
-      usedAt: new Date(),
-    });
+    // The unused/unexpired check happens inside the UPDATE, so when two
+    // requests race with the same token only one of them changes the row.
+    const now = new Date();
+    const { affected } = await this.passwordResetTokenRepository.update(
+      { tokenHash, usedAt: IsNull(), expiresAt: MoreThan(now) },
+      { usedAt: now },
+    );
 
-    return resetToken.userId;
+    return affected === 1 ? resetToken.userId : null;
+  }
+
+  // Marks every still-unused token of the user as used, so older reset links
+  // (e.g. from "Resend email") stop working once the password is changed.
+  public async revokeAllForUser(userId: string): Promise<void> {
+    await this.passwordResetTokenRepository.update(
+      { userId, usedAt: IsNull() },
+      { usedAt: new Date() },
+    );
   }
 
   private hashToken(token: string): string {

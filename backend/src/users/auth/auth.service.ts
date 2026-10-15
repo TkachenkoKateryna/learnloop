@@ -1,6 +1,7 @@
 import {
   ConflictException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { createHash, randomUUID, timingSafeEqual } from 'crypto';
@@ -27,6 +28,7 @@ export interface AuthTokens {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   private readonly jwtConfig: AuthConfig['jwt'];
   private readonly passwordResetConfig: AuthConfig['passwordReset'];
 
@@ -105,6 +107,14 @@ export class AuthService {
       return;
     }
 
+    // Not awaited: waiting for the token write and SendGrid would make known
+    // emails answer slower - or fail when mail is down - than unknown ones.
+    void this.sendPasswordResetEmail(user).catch((error: unknown) => {
+      this.logger.error('Failed to send password reset email', error);
+    });
+  }
+
+  private async sendPasswordResetEmail(user: User): Promise<void> {
     const token = await this.passwordResetService.createToken(user.id);
     const resetUrl = `${this.passwordResetConfig.resetUrl}?token=${token}`;
 
@@ -122,6 +132,7 @@ export class AuthService {
     }
 
     await this.userService.updatePassword(userId, newPassword);
+    await this.passwordResetService.revokeAllForUser(userId);
     await this.sessionService.revokeAllForUser(userId);
   }
 

@@ -1,29 +1,30 @@
-import { useEffect, useState, type ChangeEvent, type SubmitEvent } from 'react';
+import { useState, type ChangeEvent, type SubmitEvent } from 'react';
 import { ChevronLeft, MailCheck, Signpost } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
-import Input from '../../components/input/Input';
+import Input from '../../components/ui/input/Input';
 import styles from './ForgotPasswordPage.module.css';
-import { clearError, forgotPassword } from '../../store';
-import type { AppDispatch, RootState } from '../../store';
+import {
+  authService,
+  type ForgotPasswordRequest,
+} from '../../features/authentication';
+import { useAsyncAction } from '../../hooks/useAsyncAction';
 
 const ForgotPasswordPage = () => {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
 
-  const dispatch = useDispatch<AppDispatch>();
-  const { status, error } = useSelector((state: RootState) => state.auth);
-  const isSubmitting = status === 'loading';
+  const {
+    run: sendResetEmail,
+    isPending: isSubmitting,
+    error,
+  } = useAsyncAction(
+    (payload: ForgotPasswordRequest) => authService.forgotPassword(payload),
+    'Failed to send the reset email.',
+  );
   const canSubmit = email.trim() !== '' && !isSubmitting;
 
-  useEffect(() => {
-    dispatch(clearError());
-  }, [dispatch]);
-
   const requestResetEmail = async () => {
-    const result = await dispatch(forgotPassword({ email: email.trim() }));
-
-    if (forgotPassword.fulfilled.match(result)) {
+    if (await sendResetEmail({ email: email.trim() })) {
       setSubmitted(true);
     }
   };

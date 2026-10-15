@@ -1,50 +1,70 @@
-import { useEffect, useRef, useState } from 'react';
-import { Route, Routes } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
-import SignUpPage from './pages/signup/SignUpPage';
-import LoginPage from './pages/login/LoginPage';
-import ForgotPasswordPage from './pages/forgot-password/ForgotPasswordPage';
-import ResetPasswordPage from './pages/reset-password/ResetPasswordPage';
-import BookAdminPage from './pages/books/BookAdminPage';
-import RequireAuth from './components/RequireAuth';
-import GuestOnly from './components/GuestOnly';
-import AppLayout from './components/layout/AppLayout';
-import { refreshSession } from './store';
-import type { AppDispatch } from './store';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import AppRoutes from './routes/AppRoutes';
+import { refreshSession } from './features/authentication';
+import { useAppDispatch } from './store/hooks';
+import styles from './App.module.css';
+
+type RestoreStatus = 'pending' | 'done' | 'unavailable' | 'retrying';
 
 function App() {
-  const dispatch = useDispatch<AppDispatch>();
-  const [isRestoringSession, setIsRestoringSession] = useState(true);
-  const hasRestoredSession = useRef(false);
+  const dispatch = useAppDispatch();
+  const [restoreStatus, setRestoreStatus] = useState<RestoreStatus>('pending');
+  const hasStartedRestore = useRef(false);
 
-  useEffect(() => {
-    if (hasRestoredSession.current) {
-      return;
-    }
-    hasRestoredSession.current = true;
+  const restoreSession = useCallback(async () => {
+    const result = await dispatch(refreshSession());
+    const isUnavailable =
+      refreshSession.rejected.match(result) && result.payload === 'unavailable';
 
-    dispatch(refreshSession()).finally(() => setIsRestoringSession(false));
+    setRestoreStatus(isUnavailable ? 'unavailable' : 'done');
   }, [dispatch]);
 
-  if (isRestoringSession) {
+  useEffect(() => {
+    if (hasStartedRestore.current) {
+      return;
+    }
+    hasStartedRestore.current = true;
+
+    restoreSession();
+  }, [restoreSession]);
+
+  const handleRetry = () => {
+    setRestoreStatus('retrying');
+    restoreSession();
+  };
+
+  if (restoreStatus === 'pending') {
     return null;
+  }
+
+  if (restoreStatus === 'unavailable' || restoreStatus === 'retrying') {
+    const isRetrying = restoreStatus === 'retrying';
+
+    return (
+      <main className={styles.sessionRestore}>
+        <section className={styles.sessionRestore__content}>
+          <h1 className={styles.sessionRestore__title}>
+            Can&apos;t reach the server
+          </h1>
+          <p className={styles.sessionRestore__message}>
+            Check your internet connection and try again.
+          </p>
+          <button
+            type="button"
+            className={styles.sessionRestore__retry}
+            onClick={handleRetry}
+            disabled={isRetrying}
+          >
+            {isRetrying ? 'Trying again...' : 'Try again'}
+          </button>
+        </section>
+      </main>
+    );
   }
 
   return (
     <div>
-      <Routes>
-        <Route element={<GuestOnly />}>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/signup" element={<SignUpPage />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
-        </Route>
-        <Route element={<RequireAuth />}>
-          <Route element={<AppLayout />}>
-            <Route path="/books" element={<BookAdminPage />} />
-          </Route>
-        </Route>
-      </Routes>
+      <AppRoutes />
     </div>
   );
 }
