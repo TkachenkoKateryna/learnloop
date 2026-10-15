@@ -1,0 +1,58 @@
+.sessionRestore {
+  min-height: 100vh;
+  width: 100%;
+  background: #fff;
+
+  display: flex;
+  justify-content: center;
+}
+
+.sessionRestore__content {
+  width: min(100% - 32px, 420px);
+  padding-top: 64px;
+  padding-bottom: 64px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.sessionRestore__title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.sessionRestore__message {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.sessionRestore__retry {
+  width: 100%;
+  height: 52px;
+  margin-top: 32px;
+  border: none;
+  border-radius: 14px;
+  background: orange;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 8px 16px rgba(255, 165, 0, 0.25);
+  transition: background-color 150ms ease;
+}
+
+@media (hover: hover) {
+  .sessionRestore__retry:hover:not(:disabled) {
+    background: #e08900;
+  }
+}
+
+.sessionRestore__retry:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}

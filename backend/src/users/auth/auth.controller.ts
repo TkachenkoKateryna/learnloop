@@ -22,6 +22,8 @@ import { Public } from '../decorators/public.decorator';
 import { User } from '../entities/user.entity';
 import { CreateUserDto } from '../dto/create-user.dto';
 import { LoginDto } from '../dto/login.dto';
+import { ForgotPasswordDto } from '../dto/forgot-password.dto';
+import { ResetPasswordDto } from '../dto/reset-password.dto';
 import { LoginResponse } from '../dto/login.response';
 import { type AuthRequest } from '../interfaces/auth.request';
 import { type RefreshTokenRequest } from '../interfaces/refresh-token';
@@ -57,6 +59,27 @@ export class AuthController {
     );
 
     return new LoginResponse(accessToken);
+  }
+
+  @Post('forgot-password')
+  @Public()
+  @HttpCode(200)
+  async forgotPassword(
+    @Body() forgotPasswordDto: ForgotPasswordDto,
+  ): Promise<void> {
+    await this.authService.forgotPassword(forgotPasswordDto.email);
+  }
+
+  @Post('reset-password')
+  @Public()
+  @HttpCode(200)
+  async resetPassword(
+    @Body() resetPasswordDto: ResetPasswordDto,
+  ): Promise<void> {
+    await this.authService.resetPassword(
+      resetPasswordDto.token,
+      resetPasswordDto.newPassword,
+    );
   }
 
   @Post('refresh')

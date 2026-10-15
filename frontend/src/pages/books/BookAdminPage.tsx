@@ -1,18 +1,20 @@
 import { useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { fetchBooks, removeBook } from '../../store';
-import type { AppDispatch, RootState } from '../../store';
-import { deleteItem } from '../../services/books';
-import BookTable from './components/BookTable';
+import {
+  BookTable,
+  deleteItem,
+  fetchBooks,
+  removeBook,
+} from '../../features/books';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import styles from './BookAdminPage.module.css';
 
 const BookAdminPage = () => {
-  const dispatch = useDispatch<AppDispatch>();
+  const dispatch = useAppDispatch();
   const {
     items: books,
     status,
     error,
-  } = useSelector((state: RootState) => state.books);
+  } = useAppSelector((state) => state.books);
 
   useEffect(() => {
     dispatch(fetchBooks());

@@ -37,4 +37,8 @@ export class SessionService {
   async revoke(id: string): Promise<void> {
     await this.sessionRepository.update(id, { revokedAt: new Date() });
   }
+
+  async revokeAllForUser(userId: string): Promise<void> {
+    await this.sessionRepository.update({ userId }, { revokedAt: new Date() });
+  }
 }

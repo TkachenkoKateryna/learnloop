@@ -1,6 +1,7 @@
 import {
   ConflictException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { createHash, randomUUID, timingSafeEqual } from 'crypto';
@@ -13,6 +14,8 @@ import { User } from '../entities/user.entity';
 import { PasswordService } from '../password/password.service';
 import { AuthConfig, ConfigType } from '../../config/config.types';
 import { SessionService } from '../session/session.service';
+import { PasswordResetService } from '../password-reset/password-reset.service';
+import { MailService } from '../../mail/mail.service';
 import { LoginDto } from '../dto/login.dto';
 import { RefreshTokenLifetime } from '../interfaces/refresh-token';
 import { JWTPayload } from '../interfaces/jwt-payload';
@@ -25,16 +28,22 @@ export interface AuthTokens {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   private readonly jwtConfig: AuthConfig['jwt'];
+  private readonly passwordResetConfig: AuthConfig['passwordReset'];
 
   constructor(
     private readonly userService: UserService,
     private readonly jwtService: JwtService,
     private readonly sessionService: SessionService,
     private readonly passwordService: PasswordService,
+    private readonly passwordResetService: PasswordResetService,
+    private readonly mailService: MailService,
     configService: ConfigService<ConfigType>,
   ) {
-    this.jwtConfig = configService.getOrThrow<AuthConfig>('auth').jwt;
+    const authConfig = configService.getOrThrow<AuthConfig>('auth');
+    this.jwtConfig = authConfig.jwt;
+    this.passwordResetConfig = authConfig.passwordReset;
   }
 
   public async register(createUserDto: CreateUserDto): Promise<User> {
@@ -87,6 +96,44 @@ export class AuthService {
     });
 
     return { ...tokens, refreshTokenCookieMaxAge: cookieMaxAge };
+  }
+
+  // Always resolves the same way whether or not the email is registered,
+  // so callers can't use this endpoint to enumerate accounts.
+  public async forgotPassword(email: string): Promise<void> {
+    const user = await this.userService.findOneByEmail(email);
+
+    if (!user) {
+      return;
+    }
+
+    // Not awaited: waiting for the token write and SendGrid would make known
+    // emails answer slower - or fail when mail is down - than unknown ones.
+    void this.sendPasswordResetEmail(user).catch((error: unknown) => {
+      this.logger.error('Failed to send password reset email', error);
+    });
+  }
+
+  private async sendPasswordResetEmail(user: User): Promise<void> {
+    const token = await this.passwordResetService.createToken(user.id);
+    const resetUrl = `${this.passwordResetConfig.resetUrl}?token=${token}`;
+
+    await this.mailService.sendPasswordResetEmail(user.email, resetUrl);
+  }
+
+  public async resetPassword(
+    token: string,
+    newPassword: string,
+  ): Promise<void> {
+    const userId = await this.passwordResetService.consumeToken(token);
+
+    if (!userId) {
+      throw new UnauthorizedException('Invalid or expired token');
+    }
+
+    await this.userService.updatePassword(userId, newPassword);
+    await this.passwordResetService.revokeAllForUser(userId);
+    await this.sessionService.revokeAllForUser(userId);
   }
 
   public async refresh(refreshToken: string | undefined): Promise<AuthTokens> {

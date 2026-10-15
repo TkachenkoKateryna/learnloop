@@ -1,9 +1,8 @@
 import { configureStore } from '@reduxjs/toolkit';
-import { booksReducer } from './booksSlice';
-import { authReducer } from './authSlice';
-
-export * from './booksSlice';
-export * from './authSlice';
+// Reducers are imported from their slice files, not the feature barrels, so
+// the store doesn't pull in feature modules that import the store back.
+import { booksReducer } from '../features/books/store/booksSlice';
+import { authReducer } from '../features/authentication/store/authSlice';
 
 export const store = configureStore({
   reducer: {

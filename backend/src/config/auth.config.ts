@@ -11,4 +11,8 @@ export const authConfig = registerAs('auth', (): AuthConfig => ({
     refreshTokenRememberMeExpiresIn: process.env
       .JWT_REFRESH_REMEMBER_ME_EXPIRES_IN as StringValue,
   },
+  passwordReset: {
+    tokenExpiresIn: process.env.PASSWORD_RESET_TOKEN_EXPIRES_IN as StringValue,
+    resetUrl: process.env.PASSWORD_RESET_URL as string,
+  },
 }));

@@ -1,4 +1,4 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
@@ -7,6 +7,8 @@ import { AuthService } from './auth.service';
 import { UserService } from '../user.service';
 import { SessionService } from '../session/session.service';
 import { PasswordService } from '../password/password.service';
+import { PasswordResetService } from '../password-reset/password-reset.service';
+import { MailService } from '../../mail/mail.service';
 import { Session } from '../entities/session.entity';
 import { User } from '../entities/user.entity';
 
@@ -20,12 +22,40 @@ const jwtConfig = {
   refreshTokenRememberMeExpiresIn: '30d',
 };
 
+const passwordResetConfig = {
+  tokenExpiresIn: '30m',
+  resetUrl: 'https://app.example.com/reset-password',
+};
+
 const sha256 = (value: string) =>
   createHash('sha256').update(value).digest('hex');
+
+const flushBackgroundWork = () =>
+  new Promise((resolve) => setImmediate(resolve));
 
 describe('AuthService', () => {
   let service: AuthService;
   let sessions: Map<string, Session>;
+  let passwordResetService: {
+    createToken: jest.Mock<Promise<string>, [string]>;
+    consumeToken: jest.Mock<Promise<string | null>, [string]>;
+    revokeAllForUser: jest.Mock<Promise<void>, [string]>;
+  };
+  let mailService: {
+    sendPasswordResetEmail: jest.Mock<Promise<void>, [string, string]>;
+  };
+  let userService: {
+    findOneByEmail: jest.Mock<Promise<User | null>, [string]>;
+    findOne: jest.Mock<Promise<User | null>, [string]>;
+    updatePassword: jest.Mock<Promise<void>, [string, string]>;
+  };
+  let sessionService: {
+    create: jest.Mock;
+    get: jest.Mock;
+    rotateRefreshToken: jest.Mock;
+    revoke: jest.Mock;
+    revokeAllForUser: jest.Mock<Promise<void>, [string]>;
+  };
 
   const credentials = {
     email: 'test@example.com',
@@ -47,16 +77,19 @@ describe('AuthService', () => {
       password: await passwordService.hash(credentials.password),
     } as User;
 
-    const userService = {
+    userService = {
       findOneByEmail: jest.fn((email: string) =>
         Promise.resolve(email === user.email ? user : null),
       ),
       findOne: jest.fn((id: string) =>
         Promise.resolve(id === user.id ? user : null),
       ),
+      updatePassword: jest.fn<Promise<void>, [string, string]>(() =>
+        Promise.resolve(),
+      ),
     };
 
-    const sessionService = {
+    sessionService = {
       create: jest.fn((data: Partial<Session> & { id: string }) => {
         const session = { ...data, revokedAt: null } as Session;
         sessions.set(session.id, session);
@@ -73,6 +106,32 @@ describe('AuthService', () => {
         sessions.get(id)!.revokedAt = new Date();
         return Promise.resolve();
       }),
+      revokeAllForUser: jest.fn((userId: string) => {
+        for (const session of sessions.values()) {
+          if (session.userId === userId) {
+            session.revokedAt = new Date();
+          }
+        }
+        return Promise.resolve();
+      }),
+    };
+
+    passwordResetService = {
+      createToken: jest.fn((userId: string) =>
+        Promise.resolve(`token-for-${userId}`),
+      ),
+      consumeToken: jest.fn((token: string) =>
+        Promise.resolve(token === 'valid-token' ? user.id : null),
+      ),
+      revokeAllForUser: jest.fn<Promise<void>, [string]>(() =>
+        Promise.resolve(),
+      ),
+    };
+
+    mailService = {
+      sendPasswordResetEmail: jest.fn<Promise<void>, [string, string]>(() =>
+        Promise.resolve(),
+      ),
     };
 
     const module = await Test.createTestingModule({
@@ -82,9 +141,16 @@ describe('AuthService', () => {
         PasswordService,
         { provide: UserService, useValue: userService },
         { provide: SessionService, useValue: sessionService },
+        { provide: PasswordResetService, useValue: passwordResetService },
+        { provide: MailService, useValue: mailService },
         {
           provide: ConfigService,
-          useValue: { getOrThrow: () => ({ jwt: jwtConfig }) },
+          useValue: {
+            getOrThrow: () => ({
+              jwt: jwtConfig,
+              passwordReset: passwordResetConfig,
+            }),
+          },
         },
       ],
     }).compile();
@@ -171,6 +237,87 @@ describe('AuthService', () => {
       await expect(service.refresh(refreshToken)).rejects.toThrow(
         UnauthorizedException,
       );
+    });
+  });
+
+  describe('forgotPassword', () => {
+    it('creates a reset token and emails a reset link for a known email', async () => {
+      await service.forgotPassword(credentials.email);
+      await flushBackgroundWork();
+
+      expect(passwordResetService.createToken).toHaveBeenCalledWith('user-1');
+      expect(mailService.sendPasswordResetEmail).toHaveBeenCalledWith(
+        credentials.email,
+        `${passwordResetConfig.resetUrl}?token=token-for-user-1`,
+      );
+    });
+
+    it('resolves without creating a token or sending an email for an unknown email', async () => {
+      await expect(
+        service.forgotPassword('nobody@example.com'),
+      ).resolves.toBeUndefined();
+
+      expect(passwordResetService.createToken).not.toHaveBeenCalled();
+      expect(mailService.sendPasswordResetEmail).not.toHaveBeenCalled();
+    });
+
+    it('resolves without waiting for the email, so known emails answer as fast as unknown ones', async () => {
+      mailService.sendPasswordResetEmail.mockReturnValue(new Promise(() => {}));
+
+      await expect(
+        service.forgotPassword(credentials.email),
+      ).resolves.toBeUndefined();
+    });
+
+    it('still resolves and logs the error when the email fails to send', async () => {
+      const logError = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation(() => {});
+      mailService.sendPasswordResetEmail.mockRejectedValue(
+        new Error('SendGrid is down'),
+      );
+
+      await expect(
+        service.forgotPassword(credentials.email),
+      ).resolves.toBeUndefined();
+      await flushBackgroundWork();
+
+      expect(logError).toHaveBeenCalledWith(
+        'Failed to send password reset email',
+        expect.any(Error),
+      );
+      logError.mockRestore();
+    });
+  });
+
+  describe('resetPassword', () => {
+    it('updates the password and revokes all sessions for a valid token', async () => {
+      const { refreshToken } = await service.login(credentials);
+
+      await service.resetPassword('valid-token', 'NewPassword1');
+
+      expect(passwordResetService.consumeToken).toHaveBeenCalledWith(
+        'valid-token',
+      );
+      expect(userService.updatePassword).toHaveBeenCalledWith(
+        'user-1',
+        'NewPassword1',
+      );
+      expect(passwordResetService.revokeAllForUser).toHaveBeenCalledWith(
+        'user-1',
+      );
+      await expect(service.refresh(refreshToken)).rejects.toThrow(
+        UnauthorizedException,
+      );
+    });
+
+    it('rejects an invalid or expired token without touching the account', async () => {
+      await expect(
+        service.resetPassword('bad-token', 'NewPassword1'),
+      ).rejects.toThrow(UnauthorizedException);
+
+      expect(userService.updatePassword).not.toHaveBeenCalled();
+      expect(sessionService.revokeAllForUser).not.toHaveBeenCalled();
     });
   });
 
