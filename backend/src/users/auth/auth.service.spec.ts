@@ -33,6 +33,11 @@ const sha256 = (value: string) =>
 const flushBackgroundWork = () =>
   new Promise((resolve) => setImmediate(resolve));
 
+const decodeJwtPayload = (token: string): Record<string, unknown> =>
+  JSON.parse(
+    Buffer.from(token.split('.')[1], 'base64url').toString(),
+  ) as Record<string, unknown>;
+
 describe('AuthService', () => {
   let service: AuthService;
   let sessions: Map<string, Session>;
@@ -166,6 +171,15 @@ describe('AuthService', () => {
       expect(onlySession().refreshTokenHash).not.toBe(refreshToken);
     });
 
+    it('ties the access token to the new session', async () => {
+      const { accessToken } = await service.login(credentials);
+
+      expect(decodeJwtPayload(accessToken)).toMatchObject({
+        sub: 'user-1',
+        sid: onlySession().id,
+      });
+    });
+
     it.each([
       ['not remembered', false, 1, undefined],
       ['remembered', true, 30, 30 * DAY],
@@ -204,6 +218,14 @@ describe('AuthService', () => {
       expect(second.refreshToken).not.toBe(first.refreshToken);
       expect(onlySession().refreshTokenHash).toBe(sha256(second.refreshToken));
       expect(second.refreshTokenCookieMaxAge).toBe(30 * DAY);
+    });
+
+    it('issues an access token for the same session', async () => {
+      const first = await service.login(credentials);
+
+      const second = await service.refresh(first.refreshToken);
+
+      expect(decodeJwtPayload(second.accessToken).sid).toBe(onlySession().id);
     });
 
     it('revokes the session when an already-rotated token is replayed', async () => {

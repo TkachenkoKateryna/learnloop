@@ -13,9 +13,11 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import type { Response } from 'express';
+import { hours, minutes, Throttle } from '@nestjs/throttler';
 
 import { AuthService } from './auth.service';
 import { UserService } from '../user.service';
+import { LoginThrottle } from './login-throttle';
 
 import { Public } from '../decorators/public.decorator';
 
@@ -39,12 +41,14 @@ export class AuthController {
 
   @Post('register')
   @Public()
+  @Throttle({ default: { limit: 3, ttl: minutes(1) } })
   async register(@Body() createUserDto: CreateUserDto): Promise<User> {
     return await this.authService.register(createUserDto);
   }
 
   @Post('login')
   @Public()
+  @LoginThrottle()
   async login(
     @Body() loginDto: LoginDto,
     @Res({ passthrough: true }) response: Response,
@@ -64,6 +68,7 @@ export class AuthController {
   @Post('forgot-password')
   @Public()
   @HttpCode(200)
+  @Throttle({ default: { limit: 3, ttl: hours(1) } })
   async forgotPassword(
     @Body() forgotPasswordDto: ForgotPasswordDto,
   ): Promise<void> {
@@ -73,6 +78,7 @@ export class AuthController {
   @Post('reset-password')
   @Public()
   @HttpCode(200)
+  @Throttle({ default: { limit: 5, ttl: minutes(15) } })
   async resetPassword(
     @Body() resetPasswordDto: ResetPasswordDto,
   ): Promise<void> {

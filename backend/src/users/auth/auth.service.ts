@@ -213,7 +213,14 @@ export class AuthService {
   ): Promise<Pick<AuthTokens, 'accessToken' | 'refreshToken'>> {
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(
-        { sub: user.id, firstName: user.firstName, lastName: user.lastName },
+        {
+          sub: user.id,
+          // Lets AuthGuard reject the token as soon as its session is revoked
+          // (logout, password reset) instead of when it expires.
+          sid: sessionId,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        },
         {
           secret: this.jwtConfig?.accessTokenSecret,
           expiresIn: this.jwtConfig?.accessTokenExpiresIn,

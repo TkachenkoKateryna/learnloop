@@ -1,7 +1,7 @@
 import type { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { api } from '../../../lib/apiClient';
 import { store } from '../../../store';
-import { refreshSession } from '../store/authThunks';
+import { isRefreshRejection, refreshSession } from '../store/authThunks';
 
 type RetriableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 
@@ -47,9 +47,9 @@ export const setupAuthInterceptor = () => {
       return api.retry(config);
     } catch (reason) {
       // Mirror the slice: drop the token only when the session is really
-      // gone. If the server was unreachable the user stays logged in, and
-      // the next 401 will try the refresh again.
-      if (reason === 'unauthorized') {
+      // gone. If the server was unreachable or rate-limited the refresh,
+      // the user stays logged in, and the next 401 will try again.
+      if (isRefreshRejection(reason) && reason.reason === 'unauthorized') {
         api.setAccessToken(null);
       }
       throw error;

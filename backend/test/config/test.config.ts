@@ -16,5 +16,21 @@ export const testConfig = {
       refreshTokenExpiresIn: '1d',
       refreshTokenRememberMeExpiresIn: '30d',
     },
+    passwordReset: {
+      tokenExpiresIn: '30m',
+      resetUrl: 'http://localhost:5173/reset-password',
+    },
+  },
+  // MailService is replaced with a mock in TestSetup; this only satisfies
+  // the config lookup so nothing reaches SendGrid.
+  mail: {
+    sendgridApiKey: 'test-key',
+    fromEmail: 'no-reply@example.com',
+    fromName: 'LearnLoop Test',
+  },
+  throttle: {
+    ttl: 60_000,
+    limit: 60,
+    skip: true,
   },
 };
