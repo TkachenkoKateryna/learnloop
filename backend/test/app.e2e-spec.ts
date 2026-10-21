@@ -256,4 +256,16 @@ describe('AppController (e2e)', () => {
       await getProfile(newAccessToken).expect(200);
     });
   });
+
+  describe('/auth/reset-password (POST)', () => {
+    it.each([123, [], {}, 'not-a-token'])(
+      'rejects token %j with 400',
+      async (token) => {
+        await request(testSetup.app.getHttpServer())
+          .post('/auth/reset-password')
+          .send({ token, newPassword: 'NewPassword123' })
+          .expect(400);
+      },
+    );
+  });
 });
