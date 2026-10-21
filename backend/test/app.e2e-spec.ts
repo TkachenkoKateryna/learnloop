@@ -1,5 +1,7 @@
+import { Logger } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { SessionService } from '../src/users/session/session.service';
 import { TestSetup } from './test-setup';
 
 describe('AppController (e2e)', () => {
@@ -22,6 +24,38 @@ describe('AppController (e2e)', () => {
     firstName: 'Test',
     lastName: 'User',
     password: 'Password123',
+  };
+
+  const login = async (password = testUser.password) => {
+    const response = await request(testSetup.app.getHttpServer())
+      .post('/auth/login')
+      .send({ email: testUser.email, password, rememberMe: false })
+      .expect(201);
+
+    return {
+      accessToken: (response.body as { accessToken: string }).accessToken,
+      cookies: response.headers['set-cookie'] as unknown as string[],
+    };
+  };
+
+  const getProfile = (accessToken: string) =>
+    request(testSetup.app.getHttpServer())
+      .get('/auth/profile')
+      .set('Authorization', `Bearer ${accessToken}`);
+
+  const waitForResetToken = async (): Promise<string> => {
+    const { sendPasswordResetEmail } = testSetup.mailService;
+
+    for (let attempt = 0; attempt < 50; attempt++) {
+      const [, resetUrl] = sendPasswordResetEmail.mock.calls.at(-1) ?? [];
+
+      if (resetUrl) {
+        return new URL(resetUrl).searchParams.get('token')!;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+
+    throw new Error('No password reset email was sent');
   };
 
   it('/ (GET)', () => {
@@ -183,40 +217,6 @@ describe('AppController (e2e)', () => {
   });
 
   describe('access tokens of a revoked session', () => {
-    const login = async (password = testUser.password) => {
-      const response = await request(testSetup.app.getHttpServer())
-        .post('/auth/login')
-        .send({ email: testUser.email, password, rememberMe: false })
-        .expect(201);
-
-      return {
-        accessToken: (response.body as { accessToken: string }).accessToken,
-        cookies: response.headers['set-cookie'] as unknown as string[],
-      };
-    };
-
-    const getProfile = (accessToken: string) =>
-      request(testSetup.app.getHttpServer())
-        .get('/auth/profile')
-        .set('Authorization', `Bearer ${accessToken}`);
-
-    // forgot-password sends the email in the background, so the mock is
-    // called shortly after the response.
-    const waitForResetToken = async (): Promise<string> => {
-      const { sendPasswordResetEmail } = testSetup.mailService;
-
-      for (let attempt = 0; attempt < 50; attempt++) {
-        const [, resetUrl] = sendPasswordResetEmail.mock.calls.at(-1) ?? [];
-
-        if (resetUrl) {
-          return new URL(resetUrl).searchParams.get('token')!;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 20));
-      }
-
-      throw new Error('No password reset email was sent');
-    };
-
     beforeEach(async () => {
       await request(testSetup.app.getHttpServer())
         .post('/auth/register')
@@ -267,5 +267,42 @@ describe('AppController (e2e)', () => {
           .expect(400);
       },
     );
+
+    it('rolls back the whole reset when a step fails, so the link can be retried', async () => {
+      await request(testSetup.app.getHttpServer())
+        .post('/auth/register')
+        .send(testUser)
+        .expect(201);
+      await request(testSetup.app.getHttpServer())
+        .post('/auth/forgot-password')
+        .send({ email: testUser.email })
+        .expect(200);
+      const token = await waitForResetToken();
+
+      const revokeSessions = jest
+        .spyOn(testSetup.app.get(SessionService), 'revokeAllForUser')
+        .mockRejectedValueOnce(new Error('database unavailable'));
+      const logError = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation(() => undefined);
+
+      try {
+        await request(testSetup.app.getHttpServer())
+          .post('/auth/reset-password')
+          .send({ token, newPassword: 'NewPassword123' })
+          .expect(500);
+      } finally {
+        revokeSessions.mockRestore();
+        logError.mockRestore();
+      }
+
+      // Nothing was saved: the old password still works and the link is unused.
+      await login();
+      await request(testSetup.app.getHttpServer())
+        .post('/auth/reset-password')
+        .send({ token, newPassword: 'NewPassword123' })
+        .expect(200);
+      await login('NewPassword123');
+    });
   });
 });

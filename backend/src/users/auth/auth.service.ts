@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { createHash, randomUUID, timingSafeEqual } from 'crypto';
 import ms, { StringValue } from 'ms';
+import { DataSource } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UserService } from '../user.service';
@@ -39,6 +40,7 @@ export class AuthService {
     private readonly passwordService: PasswordService,
     private readonly passwordResetService: PasswordResetService,
     private readonly mailService: MailService,
+    private readonly dataSource: DataSource,
     configService: ConfigService<ConfigType>,
   ) {
     const authConfig = configService.getOrThrow<AuthConfig>('auth');
@@ -125,15 +127,22 @@ export class AuthService {
     token: string,
     newPassword: string,
   ): Promise<void> {
-    const userId = await this.passwordResetService.consumeToken(token);
+    const passwordHash = await this.passwordService.hash(newPassword);
 
-    if (!userId) {
-      throw new UnauthorizedException('Invalid or expired token');
-    }
+    await this.dataSource.transaction(async (manager) => {
+      const userId = await this.passwordResetService.consumeToken(
+        token,
+        manager,
+      );
 
-    await this.userService.updatePassword(userId, newPassword);
-    await this.passwordResetService.revokeAllForUser(userId);
-    await this.sessionService.revokeAllForUser(userId);
+      if (!userId) {
+        throw new UnauthorizedException('Invalid or expired token');
+      }
+
+      await this.userService.updatePasswordHash(userId, passwordHash, manager);
+      await this.passwordResetService.revokeAllForUser(userId, manager);
+      await this.sessionService.revokeAllForUser(userId, manager);
+    });
   }
 
   public async refresh(refreshToken: string | undefined): Promise<AuthTokens> {

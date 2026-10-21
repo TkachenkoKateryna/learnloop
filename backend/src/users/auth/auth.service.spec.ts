@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import { createHash } from 'crypto';
+import { DataSource, EntityManager } from 'typeorm';
 import { AuthService } from './auth.service';
 import { UserService } from '../user.service';
 import { SessionService } from '../session/session.service';
@@ -43,8 +44,8 @@ describe('AuthService', () => {
   let sessions: Map<string, Session>;
   let passwordResetService: {
     createToken: jest.Mock<Promise<string>, [string]>;
-    consumeToken: jest.Mock<Promise<string | null>, [string]>;
-    revokeAllForUser: jest.Mock<Promise<void>, [string]>;
+    consumeToken: jest.Mock<Promise<string | null>, [string, EntityManager?]>;
+    revokeAllForUser: jest.Mock<Promise<void>, [string, EntityManager?]>;
   };
   let mailService: {
     sendPasswordResetEmail: jest.Mock<Promise<void>, [string, string]>;
@@ -52,14 +53,24 @@ describe('AuthService', () => {
   let userService: {
     findOneByEmail: jest.Mock<Promise<User | null>, [string]>;
     findOne: jest.Mock<Promise<User | null>, [string]>;
-    updatePassword: jest.Mock<Promise<void>, [string, string]>;
+    updatePasswordHash: jest.Mock<
+      Promise<void>,
+      [string, string, EntityManager?]
+    >;
   };
   let sessionService: {
     create: jest.Mock;
     get: jest.Mock;
     rotateRefreshToken: jest.Mock;
     revoke: jest.Mock;
-    revokeAllForUser: jest.Mock<Promise<void>, [string]>;
+    revokeAllForUser: jest.Mock<Promise<void>, [string, EntityManager?]>;
+  };
+  const transactionManager = {} as EntityManager;
+  let dataSource: {
+    transaction: jest.Mock<
+      Promise<unknown>,
+      [(manager: EntityManager) => Promise<unknown>]
+    >;
   };
 
   const credentials = {
@@ -89,9 +100,10 @@ describe('AuthService', () => {
       findOne: jest.fn((id: string) =>
         Promise.resolve(id === user.id ? user : null),
       ),
-      updatePassword: jest.fn<Promise<void>, [string, string]>(() =>
-        Promise.resolve(),
-      ),
+      updatePasswordHash: jest.fn<
+        Promise<void>,
+        [string, string, EntityManager?]
+      >(() => Promise.resolve()),
     };
 
     sessionService = {
@@ -128,8 +140,15 @@ describe('AuthService', () => {
       consumeToken: jest.fn((token: string) =>
         Promise.resolve(token === 'valid-token' ? user.id : null),
       ),
-      revokeAllForUser: jest.fn<Promise<void>, [string]>(() =>
+      revokeAllForUser: jest.fn<Promise<void>, [string, EntityManager?]>(() =>
         Promise.resolve(),
+      ),
+    };
+
+    dataSource = {
+      transaction: jest.fn(
+        (run: (manager: EntityManager) => Promise<unknown>) =>
+          run(transactionManager),
       ),
     };
 
@@ -148,6 +167,7 @@ describe('AuthService', () => {
         { provide: SessionService, useValue: sessionService },
         { provide: PasswordResetService, useValue: passwordResetService },
         { provide: MailService, useValue: mailService },
+        { provide: DataSource, useValue: dataSource },
         {
           provide: ConfigService,
           useValue: {
@@ -318,18 +338,41 @@ describe('AuthService', () => {
 
       await service.resetPassword('valid-token', 'NewPassword1');
 
-      expect(passwordResetService.consumeToken).toHaveBeenCalledWith(
-        'valid-token',
-      );
-      expect(userService.updatePassword).toHaveBeenCalledWith(
-        'user-1',
-        'NewPassword1',
-      );
+      const [userId, passwordHash] =
+        userService.updatePasswordHash.mock.calls[0];
+      expect(userId).toBe('user-1');
+      await expect(
+        new PasswordService().verify('NewPassword1', passwordHash),
+      ).resolves.toBe(true);
       expect(passwordResetService.revokeAllForUser).toHaveBeenCalledWith(
         'user-1',
+        transactionManager,
       );
       await expect(service.refresh(refreshToken)).rejects.toThrow(
         UnauthorizedException,
+      );
+    });
+
+    it('runs every write in a single transaction', async () => {
+      await service.resetPassword('valid-token', 'NewPassword1');
+
+      expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+      expect(passwordResetService.consumeToken).toHaveBeenCalledWith(
+        'valid-token',
+        transactionManager,
+      );
+      expect(userService.updatePasswordHash).toHaveBeenCalledWith(
+        'user-1',
+        expect.any(String),
+        transactionManager,
+      );
+      expect(passwordResetService.revokeAllForUser).toHaveBeenCalledWith(
+        'user-1',
+        transactionManager,
+      );
+      expect(sessionService.revokeAllForUser).toHaveBeenCalledWith(
+        'user-1',
+        transactionManager,
       );
     });
 
@@ -338,7 +381,7 @@ describe('AuthService', () => {
         service.resetPassword('bad-token', 'NewPassword1'),
       ).rejects.toThrow(UnauthorizedException);
 
-      expect(userService.updatePassword).not.toHaveBeenCalled();
+      expect(userService.updatePasswordHash).not.toHaveBeenCalled();
       expect(sessionService.revokeAllForUser).not.toHaveBeenCalled();
     });
   });

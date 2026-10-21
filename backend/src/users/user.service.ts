@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
 import { PasswordService } from './password/password.service';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
 
 @Injectable()
@@ -33,9 +33,13 @@ export class UserService {
     return await this.userRepository.findOneBy({ id });
   }
 
-  public async updatePassword(id: string, password: string): Promise<void> {
-    const hashedPassword = await this.passwordService.hash(password);
+  public async updatePasswordHash(
+    id: string,
+    passwordHash: string,
+    manager?: EntityManager,
+  ): Promise<void> {
+    const repository = manager?.getRepository(User) ?? this.userRepository;
 
-    await this.userRepository.update(id, { password: hashedPassword });
+    await repository.update(id, { password: passwordHash });
   }
 }
