@@ -1,9 +1,4 @@
-import {
-  ConflictException,
-  Injectable,
-  Logger,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { createHash, randomUUID, timingSafeEqual } from 'crypto';
 import ms, { StringValue } from 'ms';
 import { DataSource } from 'typeorm';
@@ -49,17 +44,7 @@ export class AuthService {
   }
 
   public async register(createUserDto: CreateUserDto): Promise<User> {
-    const existingUser = await this.userService.findOneByEmail(
-      createUserDto.email,
-    );
-
-    if (existingUser) {
-      throw new ConflictException('Email already exists');
-    }
-
-    const user = await this.userService.createUser(createUserDto);
-
-    return user;
+    return this.userService.createUser(createUserDto);
   }
 
   public async login({

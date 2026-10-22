@@ -1,9 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { User } from './entities/user.entity';
+import { User, USER_EMAIL_UNIQUE } from './entities/user.entity';
 import { PasswordService } from './password/password.service';
 import { EntityManager, Repository } from 'typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
+import {
+  isPostgresError,
+  PostgresErrorCode,
+} from '../database/postgres-errors';
+
+const EMAIL_TAKEN_MESSAGE = 'Email already exists';
 
 @Injectable()
 export class UserService {
@@ -17,6 +23,10 @@ export class UserService {
   }
 
   public async createUser(createUserDto: CreateUserDto): Promise<User> {
+    if (await this.findOneByEmail(createUserDto.email)) {
+      throw new ConflictException(EMAIL_TAKEN_MESSAGE);
+    }
+
     const hashedPassword = await this.passwordService.hash(
       createUserDto.password,
     );
@@ -26,7 +36,20 @@ export class UserService {
       password: hashedPassword,
     });
 
-    return await this.userRepository.save(user);
+    try {
+      return await this.userRepository.save(user);
+    } catch (error) {
+      if (
+        isPostgresError(
+          error,
+          PostgresErrorCode.UniqueViolation,
+          USER_EMAIL_UNIQUE,
+        )
+      ) {
+        throw new ConflictException(EMAIL_TAKEN_MESSAGE);
+      }
+      throw error;
+    }
   }
 
   public async findOne(id: string): Promise<User | null> {

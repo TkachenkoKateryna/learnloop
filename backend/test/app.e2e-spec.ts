@@ -92,6 +92,40 @@ describe('AppController (e2e)', () => {
         .expect(409);
     });
 
+    it('stores the email trimmed and lowercased', async () => {
+      const response = await request(testSetup.app.getHttpServer())
+        .post('/auth/register')
+        .send({ ...testUser, email: '  Test@Example.COM ' })
+        .expect(201);
+
+      expect(response.body).toMatchObject({ email: 'test@example.com' });
+    });
+
+    it('rejects an email that differs only in case', async () => {
+      await request(testSetup.app.getHttpServer())
+        .post('/auth/register')
+        .send(testUser)
+        .expect(201);
+
+      await request(testSetup.app.getHttpServer())
+        .post('/auth/register')
+        .send({ ...testUser, email: testUser.email.toUpperCase() })
+        .expect(409);
+    });
+
+    it('creates only one account when the same email registers twice at once', async () => {
+      const register = () =>
+        request(testSetup.app.getHttpServer())
+          .post('/auth/register')
+          .send(testUser);
+
+      const responses = await Promise.all([register(), register()]);
+
+      expect(responses.map((response) => response.status).sort()).toEqual([
+        201, 409,
+      ]);
+    });
+
     it('rejects an invalid payload', async () => {
       await request(testSetup.app.getHttpServer())
         .post('/auth/register')
@@ -122,6 +156,17 @@ describe('AppController (e2e)', () => {
 
       expect(typeof accessToken).toBe('string');
       expect(accessToken.split('.')).toHaveLength(3);
+    });
+
+    it('matches the email regardless of case and surrounding spaces', async () => {
+      await request(testSetup.app.getHttpServer())
+        .post('/auth/login')
+        .send({
+          email: ` ${testUser.email.toUpperCase()} `,
+          password: testUser.password,
+          rememberMe: false,
+        })
+        .expect(201);
     });
 
     it('rejects an incorrect password', async () => {

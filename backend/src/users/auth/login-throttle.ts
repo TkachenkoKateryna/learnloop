@@ -1,6 +1,7 @@
 import { applyDecorators, SetMetadata } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { minutes, Throttle, ThrottlerOptions } from '@nestjs/throttler';
+import { normalizeEmail } from '../utils/normalize-email';
 
 // Caps login attempts per IP across all emails, so one client can't spread
 // password guesses over many accounts. Its 429s carry a suffixed header,
@@ -33,7 +34,7 @@ export const loginIpThrottler = (
 const loginTracker = (req: Record<string, any>): string => {
   const email = (req.body as { email?: unknown } | undefined)?.email;
   const normalizedEmail =
-    typeof email === 'string' ? email.trim().toLowerCase() : '';
+    typeof email === 'string' ? normalizeEmail(email) : '';
 
   return `${String(req.ip)}:${normalizedEmail}`;
 };

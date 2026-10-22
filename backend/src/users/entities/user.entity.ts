@@ -3,6 +3,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
@@ -10,7 +11,10 @@ import {
 import { Session } from './session.entity';
 import { PasswordResetToken } from './password-reset-token.entity';
 
+export const USER_EMAIL_UNIQUE = 'UQ_user_email';
+
 @Entity()
+@Index(USER_EMAIL_UNIQUE, ['email'], { unique: true })
 export class User {
   @PrimaryGeneratedColumn('uuid')
   @Expose()
