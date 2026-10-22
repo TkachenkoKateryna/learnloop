@@ -4,24 +4,39 @@ import { DataSource } from 'typeorm';
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { testConfig } from './config/test.config';
+import { MailService } from '../src/mail/mail.service';
 
 export class TestSetup {
   app: INestApplication;
 
   dataSource: DataSource;
 
-  static async create(module: any) {
+  // Records outgoing emails instead of sending them, so tests can read the
+  // password reset link.
+  mailService = {
+    sendPasswordResetEmail: jest
+      .fn<Promise<void>, [string, string]>()
+      .mockResolvedValue(undefined),
+  };
+
+  static async create(
+    module: any,
+    configOverrides: Partial<typeof testConfig> = {},
+  ) {
     const instance = new TestSetup();
 
-    await instance.init(module);
+    await instance.init(module, configOverrides);
 
     return instance;
   }
 
-  async init(module: any) {
+  async init(module: any, configOverrides: Partial<typeof testConfig> = {}) {
+    const config = { ...testConfig, ...configOverrides };
     const lookup = (key: string) => {
-      if (key.includes('database')) return testConfig.database;
-      if (key.includes('auth')) return testConfig.auth;
+      if (key.includes('database')) return config.database;
+      if (key.includes('auth')) return config.auth;
+      if (key.includes('mail')) return config.mail;
+      if (key.includes('throttle')) return config.throttle;
       return null;
     };
 
@@ -30,6 +45,8 @@ export class TestSetup {
     })
       .overrideProvider(ConfigService)
       .useValue({ get: lookup, getOrThrow: lookup })
+      .overrideProvider(MailService)
+      .useValue(this.mailService)
       .compile();
 
     this.app = moduleFixture.createNestApplication();
@@ -53,6 +70,7 @@ export class TestSetup {
     await this.dataSource.query(
       `TRUNCATE ${tableNames} RESTART IDENTITY CASCADE;`,
     );
+    this.mailService.sendPasswordResetEmail.mockClear();
   }
 
   async teardown() {

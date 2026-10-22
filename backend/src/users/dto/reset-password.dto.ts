@@ -1,7 +1,8 @@
-import { IsNotEmpty, Matches, MinLength } from 'class-validator';
+import { IsNotEmpty, IsString, Matches, MinLength } from 'class-validator';
 
 export class ResetPasswordDto {
-  @IsNotEmpty()
+  @IsString()
+  @Matches(/^[0-9a-f]{64}$/, { message: 'Invalid or expired token' })
   token: string;
 
   @IsNotEmpty()

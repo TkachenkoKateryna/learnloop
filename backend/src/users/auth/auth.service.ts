@@ -1,11 +1,7 @@
-import {
-  ConflictException,
-  Injectable,
-  Logger,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { createHash, randomUUID, timingSafeEqual } from 'crypto';
 import ms, { StringValue } from 'ms';
+import { DataSource } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UserService } from '../user.service';
@@ -39,6 +35,7 @@ export class AuthService {
     private readonly passwordService: PasswordService,
     private readonly passwordResetService: PasswordResetService,
     private readonly mailService: MailService,
+    private readonly dataSource: DataSource,
     configService: ConfigService<ConfigType>,
   ) {
     const authConfig = configService.getOrThrow<AuthConfig>('auth');
@@ -47,17 +44,7 @@ export class AuthService {
   }
 
   public async register(createUserDto: CreateUserDto): Promise<User> {
-    const existingUser = await this.userService.findOneByEmail(
-      createUserDto.email,
-    );
-
-    if (existingUser) {
-      throw new ConflictException('Email already exists');
-    }
-
-    const user = await this.userService.createUser(createUserDto);
-
-    return user;
+    return this.userService.createUser(createUserDto);
   }
 
   public async login({
@@ -125,15 +112,22 @@ export class AuthService {
     token: string,
     newPassword: string,
   ): Promise<void> {
-    const userId = await this.passwordResetService.consumeToken(token);
+    const passwordHash = await this.passwordService.hash(newPassword);
 
-    if (!userId) {
-      throw new UnauthorizedException('Invalid or expired token');
-    }
+    await this.dataSource.transaction(async (manager) => {
+      const userId = await this.passwordResetService.consumeToken(
+        token,
+        manager,
+      );
 
-    await this.userService.updatePassword(userId, newPassword);
-    await this.passwordResetService.revokeAllForUser(userId);
-    await this.sessionService.revokeAllForUser(userId);
+      if (!userId) {
+        throw new UnauthorizedException('Invalid or expired token');
+      }
+
+      await this.userService.updatePasswordHash(userId, passwordHash, manager);
+      await this.passwordResetService.revokeAllForUser(userId, manager);
+      await this.sessionService.revokeAllForUser(userId, manager);
+    });
   }
 
   public async refresh(refreshToken: string | undefined): Promise<AuthTokens> {
@@ -213,7 +207,14 @@ export class AuthService {
   ): Promise<Pick<AuthTokens, 'accessToken' | 'refreshToken'>> {
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(
-        { sub: user.id, firstName: user.firstName, lastName: user.lastName },
+        {
+          sub: user.id,
+          // Lets AuthGuard reject the token as soon as its session is revoked
+          // (logout, password reset) instead of when it expires.
+          sid: sessionId,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        },
         {
           secret: this.jwtConfig?.accessTokenSecret,
           expiresIn: this.jwtConfig?.accessTokenExpiresIn,

@@ -50,6 +50,7 @@ const ForgotPasswordPage = () => {
               please contact support@libra.com
             </p>
           </header>
+          {error && <p className={styles.forgotPassword__error}>{error}</p>}
           <a href="mailto:" className={styles.primaryButton}>
             Open email inbox
           </a>

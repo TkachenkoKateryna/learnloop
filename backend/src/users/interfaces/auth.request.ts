@@ -1,7 +1,5 @@
+import { AccessTokenPayload } from './jwt-payload';
+
 export interface AuthRequest {
-  user: {
-    sub: string;
-    firstName: string;
-    lastName: string;
-  };
+  user: AccessTokenPayload;
 }

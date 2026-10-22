@@ -18,8 +18,9 @@ const authSlice = createSlice({
     builder
       .addCase(refreshSession.rejected, (state, action) => {
         // Only log out when the server rejected the session. If it couldn't
-        // be reached, keep the user - the next request will try again.
-        if (action.payload === 'unauthorized') {
+        // be reached or rate-limited us, keep the user - a later request
+        // will try again.
+        if (action.payload?.reason === 'unauthorized') {
           state.user = null;
         }
       })
