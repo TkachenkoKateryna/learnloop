@@ -2,6 +2,11 @@ import { Logger } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { SessionService } from '../src/users/session/session.service';
+import { UserService } from '../src/users/user.service';
+import { Role } from '../src/authorization/role.enum';
+import { Book } from '../src/books/entities/book.entity';
+import { BookLanguage } from '../src/books/enums/book-language.enum';
+import { Publisher } from '../src/publishers/entities/publisher.entity';
 import { TestSetup } from './test-setup';
 
 describe('AppController (e2e)', () => {
@@ -132,6 +137,18 @@ describe('AppController (e2e)', () => {
         .send({ ...testUser, email: 'not-an-email' })
         .expect(400);
     });
+
+    it('creates a member even when the request asks for admin', async () => {
+      await request(testSetup.app.getHttpServer())
+        .post('/auth/register')
+        .send({ ...testUser, role: Role.Admin })
+        .expect(201);
+
+      const user = await testSetup.app
+        .get(UserService)
+        .findOneByEmail(testUser.email);
+      expect(user?.role).toBe(Role.Member);
+    });
   });
 
   describe('/auth/login (POST)', () => {
@@ -234,6 +251,8 @@ describe('AppController (e2e)', () => {
         email: testUser.email,
         firstName: testUser.firstName,
         lastName: testUser.lastName,
+        role: 'member',
+        permissions: ['books:read'],
       });
       expect(response.body).not.toHaveProperty('password');
     });
@@ -258,6 +277,121 @@ describe('AppController (e2e)', () => {
         .get('/auth/profile')
         .set('Authorization', 'Bearer not-a-real-token')
         .expect(401);
+    });
+  });
+
+  describe('books authorization', () => {
+    let bookId: string;
+    let publisherId: string;
+
+    const newBook = () => ({
+      title: 'New Book',
+      isbn: '9781861972712',
+      language: BookLanguage.ENGLISH,
+      publicationDate: '2020-01-01',
+      publisherId,
+    });
+
+    const loginAs = async (role: Role): Promise<string> => {
+      const userService = testSetup.app.get(UserService);
+      const user = await userService.findOneByEmail(testUser.email);
+      await userService.updateRole(user!.id, role);
+
+      const { accessToken } = await login();
+      return accessToken;
+    };
+
+    beforeEach(async () => {
+      await request(testSetup.app.getHttpServer())
+        .post('/auth/register')
+        .send(testUser)
+        .expect(201);
+
+      const publisher = await testSetup.dataSource
+        .getRepository(Publisher)
+        .save({ name: 'Test Publisher' });
+      publisherId = publisher.id;
+
+      const book = await testSetup.dataSource.getRepository(Book).save({
+        title: 'Existing Book',
+        isbn: '9780306406157',
+        language: BookLanguage.ENGLISH,
+        publicationDate: new Date('2020-01-01'),
+        publisherId,
+      });
+      bookId = book.id;
+    });
+
+    type Method = 'get' | 'post' | 'patch' | 'delete';
+
+    const send = (method: Method, path: string, accessToken?: string) => {
+      const url = path.replace(':id', bookId);
+      const req = request(testSetup.app.getHttpServer())[method](url);
+
+      if (accessToken) {
+        req.set('Authorization', `Bearer ${accessToken}`);
+      }
+      if (method === 'post') {
+        req.send(newBook());
+      }
+      if (method === 'patch') {
+        req.send({ title: 'Updated Title' });
+      }
+
+      return req;
+    };
+
+    it.each<[Role, Method, string, number]>([
+      [Role.Member, 'get', '/books', 200],
+      [Role.Member, 'get', '/books/:id', 200],
+      [Role.Member, 'post', '/books', 403],
+      [Role.Member, 'patch', '/books/:id', 403],
+      [Role.Member, 'delete', '/books/:id', 403],
+      [Role.Librarian, 'get', '/books', 200],
+      [Role.Librarian, 'get', '/books/:id', 200],
+      [Role.Librarian, 'post', '/books', 201],
+      [Role.Librarian, 'patch', '/books/:id', 200],
+      [Role.Librarian, 'delete', '/books/:id', 403],
+      [Role.Admin, 'get', '/books', 200],
+      [Role.Admin, 'get', '/books/:id', 200],
+      [Role.Admin, 'post', '/books', 201],
+      [Role.Admin, 'patch', '/books/:id', 200],
+      [Role.Admin, 'delete', '/books/:id', 200],
+    ])('%s %s %s -> %d', async (role, method, path, status) => {
+      const accessToken = await loginAs(role);
+
+      await send(method, path, accessToken).expect(status);
+    });
+
+    it.each<[Method, string]>([
+      ['get', '/books'],
+      ['post', '/books'],
+      ['delete', '/books/:id'],
+    ])(
+      'returns 401, not 403, for %s %s without a token',
+      async (method, path) => {
+        await send(method, path).expect(401);
+      },
+    );
+
+    it('applies a role change on the next request, with the same token', async () => {
+      const accessToken = await loginAs(Role.Member);
+      await send('post', '/books', accessToken).expect(403);
+
+      const userService = testSetup.app.get(UserService);
+      const user = await userService.findOneByEmail(testUser.email);
+      await userService.updateRole(user!.id, Role.Librarian);
+
+      await send('post', '/books', accessToken).expect(201);
+    });
+
+    it('rejects an id that is not a UUID with 400', async () => {
+      const accessToken = await loginAs(Role.Member);
+
+      await request(testSetup.app.getHttpServer())
+        .get('/books/not-a-uuid')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(400);
     });
   });
 

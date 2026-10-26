@@ -6,6 +6,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AuthGuard } from './auth.guard';
 import { SessionService } from '../session/session.service';
 import { Session } from '../entities/session.entity';
+import { User } from '../entities/user.entity';
+import { Role } from '../../authorization/role.enum';
 
 interface MockRequest {
   headers: { authorization?: string };
@@ -25,6 +27,7 @@ const buildSession = (overrides: Partial<Session> = {}): Session =>
   ({
     id: 'session-id',
     userId: 'user-id',
+    user: { id: 'user-id', role: Role.Librarian } as User,
     revokedAt: null,
     expiresAt: new Date(Date.now() + HOUR_MS),
     ...overrides,
@@ -35,7 +38,7 @@ describe('AuthGuard', () => {
   let jwtService: { verifyAsync: jest.Mock };
   let configService: { get: jest.Mock };
   let reflector: { getAllAndOverride: jest.Mock };
-  let sessionService: { get: jest.Mock };
+  let sessionService: { getWithUser: jest.Mock };
 
   const createContext = (authorization?: string) => {
     const request: MockRequest = { headers: { authorization } };
@@ -59,7 +62,9 @@ describe('AuthGuard', () => {
       }),
     };
     reflector = { getAllAndOverride: jest.fn().mockReturnValue(false) };
-    sessionService = { get: jest.fn().mockResolvedValue(buildSession()) };
+    sessionService = {
+      getWithUser: jest.fn().mockResolvedValue(buildSession()),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -103,7 +108,7 @@ describe('AuthGuard', () => {
     await expect(guard.canActivate(context)).rejects.toThrow(
       UnauthorizedException,
     );
-    expect(sessionService.get).not.toHaveBeenCalled();
+    expect(sessionService.getWithUser).not.toHaveBeenCalled();
   });
 
   it('verifies the token using the configured JWT secret', async () => {
@@ -118,20 +123,20 @@ describe('AuthGuard', () => {
     });
   });
 
-  it('attaches the decoded payload to the request and allows access while the session is active', async () => {
+  it('attaches the payload and the user role to the request and allows access while the session is active', async () => {
     jwtService.verifyAsync.mockResolvedValue(tokenPayload);
     const { context, request } = createContext('Bearer good-token');
 
     const result = await guard.canActivate(context);
 
     expect(result).toBe(true);
-    expect(sessionService.get).toHaveBeenCalledWith('session-id');
-    expect(request.user).toEqual(tokenPayload);
+    expect(sessionService.getWithUser).toHaveBeenCalledWith('session-id');
+    expect(request.user).toEqual({ ...tokenPayload, role: Role.Librarian });
   });
 
   it('throws when the session was revoked (logout, password reset)', async () => {
     jwtService.verifyAsync.mockResolvedValue(tokenPayload);
-    sessionService.get.mockResolvedValue(
+    sessionService.getWithUser.mockResolvedValue(
       buildSession({ revokedAt: new Date() }),
     );
     const { context, request } = createContext('Bearer good-token');
@@ -144,7 +149,7 @@ describe('AuthGuard', () => {
 
   it('throws when the session has expired', async () => {
     jwtService.verifyAsync.mockResolvedValue(tokenPayload);
-    sessionService.get.mockResolvedValue(
+    sessionService.getWithUser.mockResolvedValue(
       buildSession({ expiresAt: new Date(Date.now() - HOUR_MS) }),
     );
     const { context } = createContext('Bearer good-token');
@@ -156,7 +161,7 @@ describe('AuthGuard', () => {
 
   it('throws when the session does not exist', async () => {
     jwtService.verifyAsync.mockResolvedValue(tokenPayload);
-    sessionService.get.mockResolvedValue(null);
+    sessionService.getWithUser.mockResolvedValue(null);
     const { context } = createContext('Bearer good-token');
 
     await expect(guard.canActivate(context)).rejects.toThrow(
@@ -174,12 +179,14 @@ describe('AuthGuard', () => {
     await expect(guard.canActivate(context)).rejects.toThrow(
       UnauthorizedException,
     );
-    expect(sessionService.get).not.toHaveBeenCalled();
+    expect(sessionService.getWithUser).not.toHaveBeenCalled();
   });
 
   it('lets a database error through instead of reporting an invalid token', async () => {
     jwtService.verifyAsync.mockResolvedValue(tokenPayload);
-    sessionService.get.mockRejectedValue(new Error('connection refused'));
+    sessionService.getWithUser.mockRejectedValue(
+      new Error('connection refused'),
+    );
     const { context } = createContext('Bearer good-token');
 
     await expect(guard.canActivate(context)).rejects.toThrow(
@@ -208,6 +215,6 @@ describe('AuthGuard', () => {
 
     expect(result).toBe(true);
     expect(jwtService.verifyAsync).not.toHaveBeenCalled();
-    expect(sessionService.get).not.toHaveBeenCalled();
+    expect(sessionService.getWithUser).not.toHaveBeenCalled();
   });
 });

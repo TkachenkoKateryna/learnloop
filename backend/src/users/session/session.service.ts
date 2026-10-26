@@ -16,6 +16,13 @@ export class SessionService {
     });
   }
 
+  async getWithUser(sessionId: string): Promise<Session | null> {
+    return this.sessionRepository.findOne({
+      where: { id: sessionId },
+      relations: { user: true },
+    });
+  }
+
   async create(
     data: Pick<
       Session,

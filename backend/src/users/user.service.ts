@@ -8,6 +8,7 @@ import {
   isPostgresError,
   PostgresErrorCode,
 } from '../database/postgres-errors';
+import { Role } from '../authorization/role.enum';
 
 const EMAIL_TAKEN_MESSAGE = 'Email already exists';
 
@@ -64,5 +65,9 @@ export class UserService {
     const repository = manager?.getRepository(User) ?? this.userRepository;
 
     await repository.update(id, { password: passwordHash });
+  }
+
+  public async updateRole(id: string, role: Role): Promise<void> {
+    await this.userRepository.update(id, { role });
   }
 }

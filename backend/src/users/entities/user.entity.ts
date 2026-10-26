@@ -1,5 +1,6 @@
 import { Expose } from 'class-transformer';
 import {
+  Check,
   Column,
   CreateDateColumn,
   Entity,
@@ -10,11 +11,18 @@ import {
 } from 'typeorm';
 import { Session } from './session.entity';
 import { PasswordResetToken } from './password-reset-token.entity';
+import { Role } from '../../authorization/role.enum';
 
 export const USER_EMAIL_UNIQUE = 'UQ_user_email';
+export const USER_ROLE_CHECK = 'CHK_user_role';
+
+const ROLE_VALUES = Object.values(Role)
+  .map((role) => `'${role}'`)
+  .join(', ');
 
 @Entity()
 @Index(USER_EMAIL_UNIQUE, ['email'], { unique: true })
+@Check(USER_ROLE_CHECK, `"role" IN (${ROLE_VALUES})`)
 export class User {
   @PrimaryGeneratedColumn('uuid')
   @Expose()
@@ -34,6 +42,9 @@ export class User {
 
   @Column()
   password: string;
+
+  @Column({ type: 'varchar', length: 20, default: Role.Member })
+  role: Role;
 
   @CreateDateColumn({ type: 'timestamptz' })
   @Expose()
