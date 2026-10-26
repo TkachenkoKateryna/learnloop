@@ -27,6 +27,10 @@ export const getErrorMessage = (error: unknown, fallback: string): string => {
       : 'Too many requests. Please wait a moment and try again.';
   }
 
+  if (error.response.status === 403) {
+    return "This action isn't available for your account.";
+  }
+
   const message: unknown = error.response.data?.message;
 
   if (Array.isArray(message)) {

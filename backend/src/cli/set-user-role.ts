@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../app.module';
 import { Role } from '../authorization/role.enum';
+import { AuthService } from '../users/auth/auth.service';
 import { UserService } from '../users/user.service';
 import { normalizeEmail } from '../users/utils/normalize-email';
 
@@ -24,8 +25,9 @@ async function main(): Promise<void> {
   });
 
   try {
-    const userService = app.get(UserService);
-    const user = await userService.findOneByEmail(normalizeEmail(email));
+    const user = await app
+      .get(UserService)
+      .findOneByEmail(normalizeEmail(email));
 
     if (!user) {
       console.error(`No user with email ${email}`);
@@ -33,8 +35,13 @@ async function main(): Promise<void> {
       return;
     }
 
-    await userService.updateRole(user.id, role);
-    console.log(`${user.email}: ${user.role} -> ${role}`);
+    const changed = await app.get(AuthService).changeRole(user, role);
+
+    console.log(
+      changed
+        ? `${user.email}: ${user.role} -> ${role} (signed out of all sessions)`
+        : `${user.email} is already ${role}`,
+    );
   } finally {
     await app.close();
   }

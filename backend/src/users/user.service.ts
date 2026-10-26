@@ -67,7 +67,13 @@ export class UserService {
     await repository.update(id, { password: passwordHash });
   }
 
-  public async updateRole(id: string, role: Role): Promise<void> {
-    await this.userRepository.update(id, { role });
+  public async updateRole(
+    id: string,
+    role: Role,
+    manager?: EntityManager,
+  ): Promise<void> {
+    const repository = manager?.getRepository(User) ?? this.userRepository;
+
+    await repository.update(id, { role });
   }
 }

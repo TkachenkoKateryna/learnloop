@@ -1,0 +1,37 @@
+.denied {
+  width: 100%;
+  max-width: 64rem;
+  border-radius: 1rem;
+  background-color: oklch(27.8% 0.033 256.848 / 50%);
+  box-shadow:
+    0 20px 25px -5px rgb(0 0 0 / 0.1),
+    0 8px 10px -6px rgb(0 0 0 / 0.1);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  padding: 2rem;
+}
+
+.denied__title {
+  margin-bottom: 0.75rem;
+  font-size: 1.5rem;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.denied__text {
+  margin-bottom: 1.5rem;
+  color: oklch(70.7% 0.022 261.325);
+}
+
+.denied__link {
+  color: orange;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+@media (hover: hover) {
+  .denied__link:hover {
+    text-decoration: underline;
+  }
+}

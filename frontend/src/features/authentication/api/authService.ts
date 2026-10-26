@@ -6,6 +6,7 @@ import type {
   RegisterRequest,
   ResetPasswordRequest,
   User,
+  UserAccount,
 } from '../types/auth';
 
 const basePath = 'auth';
@@ -17,8 +18,8 @@ export class AuthService {
     );
   }
 
-  register(payload: RegisterRequest): Promise<User> {
-    return api.post<User>(`${basePath}/register`, payload);
+  register(payload: RegisterRequest): Promise<UserAccount> {
+    return api.post<UserAccount>(`${basePath}/register`, payload);
   }
 
   refresh(): Promise<User> {

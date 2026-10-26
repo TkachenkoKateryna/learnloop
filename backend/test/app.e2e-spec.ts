@@ -3,6 +3,7 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { SessionService } from '../src/users/session/session.service';
 import { UserService } from '../src/users/user.service';
+import { AuthService } from '../src/users/auth/auth.service';
 import { Role } from '../src/authorization/role.enum';
 import { Book } from '../src/books/entities/book.entity';
 import { BookLanguage } from '../src/books/enums/book-language.enum';
@@ -292,10 +293,15 @@ describe('AppController (e2e)', () => {
       publisherId,
     });
 
+    const setRole = async (role: Role) => {
+      const user = await testSetup.app
+        .get(UserService)
+        .findOneByEmail(testUser.email);
+      await testSetup.app.get(AuthService).changeRole(user!, role);
+    };
+
     const loginAs = async (role: Role): Promise<string> => {
-      const userService = testSetup.app.get(UserService);
-      const user = await userService.findOneByEmail(testUser.email);
-      await userService.updateRole(user!.id, role);
+      await setRole(role);
 
       const { accessToken } = await login();
       return accessToken;
@@ -374,15 +380,17 @@ describe('AppController (e2e)', () => {
       },
     );
 
-    it('applies a role change on the next request, with the same token', async () => {
-      const accessToken = await loginAs(Role.Member);
-      await send('post', '/books', accessToken).expect(403);
+    it('signs the user out on a role change, and the next login has the new role', async () => {
+      const oldToken = await loginAs(Role.Member);
+      await send('post', '/books', oldToken).expect(403);
 
-      const userService = testSetup.app.get(UserService);
-      const user = await userService.findOneByEmail(testUser.email);
-      await userService.updateRole(user!.id, Role.Librarian);
+      await setRole(Role.Librarian);
+      await send('post', '/books', oldToken).expect(401);
 
+      const { accessToken } = await login();
       await send('post', '/books', accessToken).expect(201);
+      const profile = await getProfile(accessToken).expect(200);
+      expect(profile.body).toMatchObject({ role: Role.Librarian });
     });
 
     it('rejects an id that is not a UUID with 400', async () => {
