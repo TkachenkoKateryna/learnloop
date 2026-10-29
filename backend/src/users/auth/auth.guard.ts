@@ -9,7 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
 import { AuthConfig, ConfigType } from '../../config/config.types';
 import { Reflector } from '@nestjs/core';
-import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { IS_PUBLIC_KEY } from '../../authorization/public.decorator';
 import { AccessTokenPayload } from '../interfaces/jwt-payload';
 import { RequestUser } from '../interfaces/auth.request';
 import { SessionService } from '../session/session.service';
@@ -70,7 +70,7 @@ export class AuthGuard implements CanActivate {
       return null;
     }
 
-    const session = await this.sessionService.getWithUser(sessionId);
+    const session = await this.sessionService.getWithUserRole(sessionId);
 
     return session && !session.revokedAt && session.expiresAt > new Date()
       ? session

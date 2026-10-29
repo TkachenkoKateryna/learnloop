@@ -1,3 +1,4 @@
+import { ConflictException } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../app.module';
 import { Role } from '../authorization/role.enum';
@@ -35,7 +36,17 @@ async function main(): Promise<void> {
       return;
     }
 
-    const changed = await app.get(AuthService).changeRole(user, role);
+    let changed: boolean;
+    try {
+      changed = await app.get(AuthService).changeRole(user, role);
+    } catch (error) {
+      if (error instanceof ConflictException) {
+        console.error(`${user.email}: ${error.message}`);
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
 
     console.log(
       changed

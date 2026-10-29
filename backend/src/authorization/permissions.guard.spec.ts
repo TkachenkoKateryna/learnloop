@@ -7,9 +7,10 @@ import { Reflector } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PermissionsGuard } from './permissions.guard';
 import { PERMISSIONS_KEY } from './permissions.decorator';
+import { IS_AUTHENTICATED_KEY } from './authenticated.decorator';
 import { Permission, Permissions } from './permissions';
 import { Role } from './role.enum';
-import { IS_PUBLIC_KEY } from '../users/decorators/public.decorator';
+import { IS_PUBLIC_KEY } from './public.decorator';
 
 interface MockRequest {
   user?: { sub: string; role: Role };
@@ -32,13 +33,16 @@ describe('PermissionsGuard', () => {
 
   const setMetadata = ({
     isPublic = false,
+    isAuthenticated = false,
     permissions,
   }: {
     isPublic?: boolean;
+    isAuthenticated?: boolean;
     permissions?: Permission[];
   }) => {
     reflector.getAllAndOverride.mockImplementation((key: string) => {
       if (key === IS_PUBLIC_KEY) return isPublic;
+      if (key === IS_AUTHENTICATED_KEY) return isAuthenticated;
       if (key === PERMISSIONS_KEY) return permissions;
       return undefined;
     });
@@ -61,16 +65,48 @@ describe('PermissionsGuard', () => {
     jest.clearAllMocks();
   });
 
-  it('allows a route without @RequirePermissions', () => {
+  it('throws Forbidden for a route with no metadata', () => {
     setMetadata({});
 
-    expect(guard.canActivate(createContext())).toBe(true);
+    expect(() => guard.canActivate(createContext())).toThrow(
+      ForbiddenException,
+    );
   });
 
-  it('allows a route with an empty @RequirePermissions()', () => {
+  it('throws Forbidden for a route with an empty @RequirePermissions()', () => {
     setMetadata({ permissions: [] });
 
-    expect(guard.canActivate(createContext())).toBe(true);
+    expect(() => guard.canActivate(createContext())).toThrow(
+      ForbiddenException,
+    );
+  });
+
+  it('allows any signed-in user on an @Authenticated route', () => {
+    setMetadata({ isAuthenticated: true });
+    const context = createContext({
+      user: { sub: 'user-id', role: Role.Member },
+    });
+
+    expect(guard.canActivate(context)).toBe(true);
+  });
+
+  it('throws Unauthorized on an @Authenticated route without a user', () => {
+    setMetadata({ isAuthenticated: true });
+
+    expect(() => guard.canActivate(createContext({}))).toThrow(
+      UnauthorizedException,
+    );
+  });
+
+  it('still checks permissions on an @Authenticated route that requires them', () => {
+    setMetadata({
+      isAuthenticated: true,
+      permissions: [Permissions.Books.Delete],
+    });
+
+    expect(() => guard.canActivate(createContext())).toThrow(
+      ForbiddenException,
+    );
   });
 
   it('allows a route marked @Public even without a user', () => {

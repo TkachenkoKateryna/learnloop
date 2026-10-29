@@ -76,4 +76,14 @@ export class UserService {
 
     await repository.update(id, { role });
   }
+
+  public async lockAdminIds(manager: EntityManager): Promise<string[]> {
+    const admins = await manager.getRepository(User).find({
+      select: { id: true },
+      where: { role: Role.Admin },
+      lock: { mode: 'pessimistic_write' },
+    });
+
+    return admins.map(({ id }) => id);
+  }
 }

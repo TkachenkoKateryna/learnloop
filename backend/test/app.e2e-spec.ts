@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { ConflictException, Logger } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { SessionService } from '../src/users/session/session.service';
@@ -8,6 +8,7 @@ import { Role } from '../src/authorization/role.enum';
 import { Book } from '../src/books/entities/book.entity';
 import { BookLanguage } from '../src/books/enums/book-language.enum';
 import { Publisher } from '../src/publishers/entities/publisher.entity';
+import { User } from '../src/users/entities/user.entity';
 import { TestSetup } from './test-setup';
 
 describe('AppController (e2e)', () => {
@@ -400,6 +401,69 @@ describe('AppController (e2e)', () => {
         .get('/books/not-a-uuid')
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(400);
+    });
+  });
+
+  describe('last admin', () => {
+    const otherUser = { ...testUser, email: 'other@example.com' };
+
+    const findUser = (email: string) =>
+      testSetup.app.get(UserService).findOneByEmail(email);
+
+    const changeRole = async (email: string, role: Role) =>
+      testSetup.app.get(AuthService).changeRole((await findUser(email))!, role);
+
+    const countAdmins = () =>
+      testSetup.dataSource.getRepository(User).countBy({ role: Role.Admin });
+
+    beforeEach(async () => {
+      for (const user of [testUser, otherUser]) {
+        await request(testSetup.app.getHttpServer())
+          .post('/auth/register')
+          .send(user)
+          .expect(201);
+        await changeRole(user.email, Role.Admin);
+      }
+    });
+
+    it('cannot lose the admin role', async () => {
+      await changeRole(otherUser.email, Role.Member);
+
+      await expect(changeRole(testUser.email, Role.Librarian)).rejects.toThrow(
+        ConflictException,
+      );
+      expect((await findUser(testUser.email))?.role).toBe(Role.Admin);
+    });
+
+    it('stays an admin when two admins are demoted at the same time', async () => {
+      const userService = testSetup.app.get<UserService>(UserService);
+      const lockAdminIds = userService.lockAdminIds.bind(
+        userService,
+      ) as UserService['lockAdminIds'];
+      // Holds each transaction open after the check, so without the row lock
+      // both demotions would see two admins and both commit.
+      const spy = jest
+        .spyOn(userService, 'lockAdminIds')
+        .mockImplementation(async (manager) => {
+          const ids = await lockAdminIds(manager);
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          return ids;
+        });
+
+      try {
+        const results = await Promise.allSettled([
+          changeRole(testUser.email, Role.Member),
+          changeRole(otherUser.email, Role.Member),
+        ]);
+
+        expect(results.map(({ status }) => status).sort()).toEqual([
+          'fulfilled',
+          'rejected',
+        ]);
+        expect(await countAdmins()).toBe(1);
+      } finally {
+        spy.mockRestore();
+      }
     });
   });
 

@@ -144,7 +144,7 @@ Tables are grouped by area: **catalog** (publishers, books, authors, book_author
 - `UNIQUE INDEX (lower(email))`: uniqueness ignores case.
 - `anonymized_at` is set instead of deleting a user who has borrowing history.
 - `CHECK (role IN ('admin', 'librarian', 'member'))`, `DEFAULT 'member'`: every user has exactly one role, and sign-up creates members.
-- Roles are fixed. What each role may do is defined in code, not in the database; see the [authorization guide](authorization-guide.md).
+- Roles are fixed. What each role may do is defined in code, not in the database; see [Roles & Permissions](roles-and-permissions.md).
 
 ## Delete behaviour
 

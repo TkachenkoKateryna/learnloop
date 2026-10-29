@@ -20,7 +20,7 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "user:set-role": "ts-node src/cli/set-user-role.ts"
+    "user:set-role": "node dist/cli/set-user-role.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

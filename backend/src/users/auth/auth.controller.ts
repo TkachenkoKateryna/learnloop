@@ -18,7 +18,8 @@ import { AuthService } from './auth.service';
 import { UserService } from '../user.service';
 import { LoginThrottle } from './login-throttle';
 
-import { Public } from '../decorators/public.decorator';
+import { Public } from '../../authorization/public.decorator';
+import { Authenticated } from '../../authorization/authenticated.decorator';
 import { CurrentUser } from '../decorators/current-user.decorator';
 
 import { User } from '../entities/user.entity';
@@ -120,6 +121,7 @@ export class AuthController {
   }
 
   @Get('/profile')
+  @Authenticated()
   async profile(
     @CurrentUser() currentUser: RequestUser,
   ): Promise<ProfileResponse> {
