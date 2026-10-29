@@ -1,4 +1,9 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { createHash, randomUUID, timingSafeEqual } from 'crypto';
 import ms, { StringValue } from 'ms';
 import { DataSource } from 'typeorm';
@@ -15,6 +20,9 @@ import { MailService } from '../../mail/mail.service';
 import { LoginDto } from '../dto/login.dto';
 import { RefreshTokenLifetime } from '../interfaces/refresh-token';
 import { JWTPayload } from '../interfaces/jwt-payload';
+import { Role } from '../../authorization/role.enum';
+
+export const LAST_ADMIN_MESSAGE = 'Cannot remove the last admin';
 
 export interface AuthTokens {
   accessToken: string;
@@ -128,6 +136,28 @@ export class AuthService {
       await this.passwordResetService.revokeAllForUser(userId, manager);
       await this.sessionService.revokeAllForUser(userId, manager);
     });
+  }
+
+  // Revoking the sessions makes the user log in again, so the UI reloads
+  // their permissions instead of showing stale ones until the next refresh.
+  public async changeRole(user: User, role: Role): Promise<boolean> {
+    if (user.role === role) {
+      return false;
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      if (role !== Role.Admin) {
+        const adminIds = await this.userService.lockAdminIds(manager);
+        if (adminIds.length === 1 && adminIds[0] === user.id) {
+          throw new ConflictException(LAST_ADMIN_MESSAGE);
+        }
+      }
+
+      await this.userService.updateRole(user.id, role, manager);
+      await this.sessionService.revokeAllForUser(user.id, manager);
+    });
+
+    return true;
   }
 
   public async refresh(refreshToken: string | undefined): Promise<AuthTokens> {

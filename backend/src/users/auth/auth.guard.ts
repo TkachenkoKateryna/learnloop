@@ -9,9 +9,11 @@ import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
 import { AuthConfig, ConfigType } from '../../config/config.types';
 import { Reflector } from '@nestjs/core';
-import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { IS_PUBLIC_KEY } from '../../authorization/public.decorator';
 import { AccessTokenPayload } from '../interfaces/jwt-payload';
+import { RequestUser } from '../interfaces/auth.request';
 import { SessionService } from '../session/session.service';
+import { Session } from '../entities/session.entity';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -47,29 +49,32 @@ export class AuthGuard implements CanActivate {
     } catch {
       throw new UnauthorizedException();
     }
-    if (!(await this.isSessionActive(payload.sid))) {
+
+    const session = await this.getActiveSession(payload.sid);
+    if (!session) {
       throw new UnauthorizedException();
     }
 
-    request['user'] = payload;
+    const user: RequestUser = { ...payload, role: session.user.role };
+    request['user'] = user;
     return true;
   }
 
   // A valid signature isn't enough: logout and password reset revoke the
   // session, and its access tokens must stop working right away.
-  private async isSessionActive(
+  private async getActiveSession(
     sessionId: string | undefined,
-  ): Promise<boolean> {
+  ): Promise<Session | null> {
     // Tokens signed before access tokens carried a session id.
     if (!sessionId) {
-      return false;
+      return null;
     }
 
-    const session = await this.sessionService.get(sessionId);
+    const session = await this.sessionService.getWithUserRole(sessionId);
 
-    return (
-      session !== null && !session.revokedAt && session.expiresAt > new Date()
-    );
+    return session && !session.revokedAt && session.expiresAt > new Date()
+      ? session
+      : null;
   }
 
   private extractTokenFromHeader(request: Request): string | undefined {

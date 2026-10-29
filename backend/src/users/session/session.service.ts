@@ -16,6 +16,19 @@ export class SessionService {
     });
   }
 
+  async getWithUserRole(sessionId: string): Promise<Session | null> {
+    return this.sessionRepository.findOne({
+      select: {
+        id: true,
+        revokedAt: true,
+        expiresAt: true,
+        user: { id: true, role: true },
+      },
+      where: { id: sessionId },
+      relations: { user: true },
+    });
+  }
+
   async create(
     data: Pick<
       Session,

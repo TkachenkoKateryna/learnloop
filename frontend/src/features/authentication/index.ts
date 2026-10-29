@@ -3,8 +3,11 @@ export { setupAuthInterceptor } from './api/setupAuthInterceptor';
 
 export { default as GuestOnly } from './components/GuestOnly';
 export { default as RequireAuth } from './components/RequireAuth';
+export { default as RequirePermission } from './components/RequirePermission';
 export { default as HomeRedirect } from './components/HomeRedirect';
 export { default as PasswordStrengthMeter } from './components/PasswordStrengthMeter';
+
+export { useCan } from './hooks/useCan';
 
 export * from './store/authThunks';
 export * from './store/authSelectors';

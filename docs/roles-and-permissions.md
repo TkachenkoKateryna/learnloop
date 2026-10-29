@@ -1,0 +1,183 @@
+# Libra — Roles & Permissions (Scope 1)
+
+As of Oct 26, 2026 · [Living version](https://claude.ai/artifact/8zTHqZttqpW8RqFRVAUxjt)
+
+## Status: target design
+
+This document describes the target design for scope 1. It is implemented one module at a time: each module adds its keys and grants to `backend/src/authorization/` when it is built, not before.
+
+| Implemented today | Keys                                                         | Admin | Librarian | Member |
+| ----------------- | ------------------------------------------------------------ | ----- | --------- | ------ |
+| `books`           | `books:read`, `books:create`, `books:update`, `books:delete` | 4     | 3         | 1      |
+| `users`           | `users:read`, `users:create`, `users:update`, `users:delete` | 4     | 0         | 0      |
+| **Total**         | 8 of 40                                                      | 8     | 3         | 1      |
+
+The implemented grants match the target matrix for these keys. Every other key in the catalog and the matrix is planned, and no role has it yet.
+
+## Overview
+
+Scope 1 ships three fixed roles (Admin, Librarian, Member) with permissions defined in code as `resource:action` keys. Routes check permissions, never role names. The screens come from the Libra admin dashboard design (Figma Community preview file).
+
+- Roles are fixed in scope 1: `ROLE_PERMISSIONS` lives in code and only `user.role` is stored in the DB.
+- Anything not granted is denied. A global guard rejects any route without `@RequirePermissions` unless it is marked `@Public()` (no sign-in) or `@Authenticated()` (any signed-in user, such as `/auth/profile`).
+- Record-level rules (a member's own loans) are policy checks in services, not extra permission keys.
+
+## Roles
+
+The design is a staff dashboard (its user is shown as "Noah Tanaka, Admin"). The only member-facing screens are Login and Register, so the Member role is inferred from what the staff screens show about members.
+
+| Role      | Value       | Who                          | What they do in the design                                                                         |
+| --------- | ----------- | ---------------------------- | -------------------------------------------------------------------------------------------------- |
+| Admin     | `admin`     | Library manager or owner     | Everything, plus finances (revenue, acquisitions), staff accounts, roles and settings              |
+| Librarian | `librarian` | Front-desk and catalog staff | Day-to-day work: catalog, loans and returns, reservations, members, damaged or lost reports, inbox |
+| Member    | `member`    | Registered patron            | Browses the catalog; sees and manages their own loans, reservations, fines and profile             |
+
+## Screens and resources
+
+The 14 desktop screens map onto 15 permission resources. Each screen also has tablet and mobile versions with the same features.
+
+| Screen               | What it shows or does                                                                                                                                               | Resources                                               |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| Dashboard V1/V2      | KPI cards (borrowed, overdue, visitors, total books), usage trends, book categories, top books and authors, recent activity, revenue and revenue breakdown          | `dashboard`, `revenue`                                  |
+| Inbox                | Mail from members (overdue follow-ups, renewals) with labels Reminders, Member Support, Book Requests; compose and reply                                            | `messages`                                              |
+| Library Activity     | Log of borrows, returns and reservations with member, book, dates, status and fine                                                                                  | `activity`, `loans`                                     |
+| Books (table, grid)  | Catalog with author, publisher, status (Available, Borrowed, Damaged), copies, shelf location, resource link; Add Book                                              | `books`                                                 |
+| Book Details         | Metadata, synopsis, tags, reservation queue, borrowing trend, borrowing history with fines, related books                                                           | `books`, `reservations`, `loans`, `fines`               |
+| Stock Management     | Stock overview (available, on loan, reserved, damaged/lost), low-stock list with Reorder, damaged/lost log with replacement status (Pending, Replaced, Written Off) | `stock`, `acquisitions`                                 |
+| Supply & Acquisition | Vendors, book-list files, purchase price, invoice number, funding source (purchase, donation, grant, exchange)                                                      | `acquisitions`                                          |
+| Members              | Member list with membership type (Basic, Standard, Premium), status (Active, Expired, Suspended), join and expiry dates, borrowed, overdue, fines; Add Member       | `members`                                               |
+| Member Details       | Profile, contact info, borrowing trend, borrowed books, reservations, payment history (membership fees), fines (late, damage)                                       | `members`, `loans`, `reservations`, `payments`, `fines` |
+| Add New Member       | Staff-created member form                                                                                                                                           | `members`                                               |
+| Login, Register      | Public sign-in and self-registration                                                                                                                                | none (`@Public()`)                                      |
+| Sidebar: Settings    | Settings entry, no screen designed                                                                                                                                  | `settings`                                              |
+| Not in design        | Staff accounts and role changes                                                                                                                                     | `users`, `roles`                                        |
+
+## Permission catalog
+
+The target catalog has 40 keys across 15 resources, each written as `resource:action`. Only `books` and `users` are in code so far (see Status). Actions come from a fixed set: `read`, `create`, `update`, `delete`, plus a few domain verbs (`return`, `cancel`, `waive`, `send`, `assign`).
+
+| Resource       | Keys                                                                                     | Covers                                                                                  |
+| -------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `dashboard`    | `dashboard:read`                                                                         | KPI cards, usage trends, categories, top books and authors, recent activity             |
+| `revenue`      | `revenue:read`                                                                           | Revenue chart and revenue breakdown on the dashboard                                    |
+| `activity`     | `activity:read`                                                                          | Library Activity log                                                                    |
+| `books`        | `books:read`, `books:create`, `books:update`, `books:delete`                             | Catalog, book details, copies, shelf location                                           |
+| `loans`        | `loans:read`, `loans:create`, `loans:return`, `loans:update`                             | Check-out, check-in, extending a due date                                               |
+| `reservations` | `reservations:read`, `reservations:create`, `reservations:update`, `reservations:cancel` | Reservation queue; `update` marks one ready for pickup                                  |
+| `members`      | `members:read`, `members:create`, `members:update`, `members:delete`                     | Member list, details, Add Member; `update` includes status (Active, Expired, Suspended) |
+| `fines`        | `fines:read`, `fines:create`, `fines:waive`                                              | Late and damage fines                                                                   |
+| `payments`     | `payments:read`, `payments:create`                                                       | Payment history; recording a membership fee or fine payment                             |
+| `stock`        | `stock:read`, `stock:create`, `stock:update`                                             | Stock overview; reporting damaged or lost copies; setting replacement status            |
+| `acquisitions` | `acquisitions:read`, `acquisitions:create`, `acquisitions:update`, `acquisitions:delete` | Vendors, purchases, invoices, funding source, Reorder                                   |
+| `messages`     | `messages:read`, `messages:send`                                                         | Inbox                                                                                   |
+| `settings`     | `settings:read`, `settings:update`                                                       | Library settings such as loan period and fine rates                                     |
+| `users`        | `users:read`, `users:create`, `users:update`, `users:delete`                             | Staff accounts                                                                          |
+| `roles`        | `roles:assign`                                                                           | Changing a user's role                                                                  |
+
+## Role → permission matrix
+
+In the target design, Admin gets all 40 keys, Librarian 27, Member 9. Today the code grants Admin 8, Librarian 3 and Member 1 (see Status). "Own" means the key is granted but the service limits it to the member's own records (see Ownership rules).
+
+| Permission            | Admin | Librarian | Member |
+| --------------------- | ----- | --------- | ------ |
+| `dashboard:read`      | Yes   | Yes       | No     |
+| `revenue:read`        | Yes   | No        | No     |
+| `activity:read`       | Yes   | Yes       | No     |
+| `books:read`          | Yes   | Yes       | Yes    |
+| `books:create`        | Yes   | Yes       | No     |
+| `books:update`        | Yes   | Yes       | No     |
+| `books:delete`        | Yes   | No        | No     |
+| `loans:read`          | Yes   | Yes       | Own    |
+| `loans:create`        | Yes   | Yes       | No     |
+| `loans:return`        | Yes   | Yes       | No     |
+| `loans:update`        | Yes   | Yes       | No     |
+| `reservations:read`   | Yes   | Yes       | Own    |
+| `reservations:create` | Yes   | Yes       | Own    |
+| `reservations:update` | Yes   | Yes       | No     |
+| `reservations:cancel` | Yes   | Yes       | Own    |
+| `members:read`        | Yes   | Yes       | Own    |
+| `members:create`      | Yes   | Yes       | No     |
+| `members:update`      | Yes   | Yes       | Own    |
+| `members:delete`      | Yes   | No        | No     |
+| `fines:read`          | Yes   | Yes       | Own    |
+| `fines:create`        | Yes   | Yes       | No     |
+| `fines:waive`         | Yes   | No        | No     |
+| `payments:read`       | Yes   | Yes       | Own    |
+| `payments:create`     | Yes   | Yes       | No     |
+| `stock:read`          | Yes   | Yes       | No     |
+| `stock:create`        | Yes   | Yes       | No     |
+| `stock:update`        | Yes   | Yes       | No     |
+| `acquisitions:read`   | Yes   | Yes       | No     |
+| `acquisitions:create` | Yes   | No        | No     |
+| `acquisitions:update` | Yes   | No        | No     |
+| `acquisitions:delete` | Yes   | No        | No     |
+| `messages:read`       | Yes   | Yes       | No     |
+| `messages:send`       | Yes   | Yes       | No     |
+| `settings:read`       | Yes   | Yes       | No     |
+| `settings:update`     | Yes   | No        | No     |
+| `users:read`          | Yes   | No        | No     |
+| `users:create`        | Yes   | No        | No     |
+| `users:update`        | Yes   | No        | No     |
+| `users:delete`        | Yes   | No        | No     |
+| `roles:assign`        | Yes   | No        | No     |
+
+The split follows one rule: Librarians run daily circulation, and anything involving money decisions, deletion or staff stays with Admin. That covers revenue, waiving fines, purchases, deleting books or members, settings, users and roles.
+
+## Ownership rules
+
+Member access is a permission plus a policy check in the service. The guard confirms the key, then the service limits the query to `memberId = currentUser.memberId`. Admin and Librarian skip the policy.
+
+| Key (Member)                  | Policy                                                                                                     |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `loans:read`                  | Only their own loans; list endpoints filter by member, detail endpoints return 404 for anyone else's       |
+| `reservations:read`           | Only their own reservations; the book's reservation queue shows their position, not other members' names   |
+| `reservations:create`         | Always for themselves; the request body has no `memberId`. Blocked when membership is Suspended or Expired |
+| `reservations:cancel`         | Only their own, and only while status is pending or ready                                                  |
+| `members:read`                | Only their own profile (`GET /members/me`)                                                                 |
+| `members:update`              | Only their own contact fields; membership type, status and dates stay staff-only                           |
+| `fines:read`, `payments:read` | Only their own                                                                                             |
+
+Return 404, not 403, for another member's record, so IDs can't be probed. Keep these checks in services, not in extra keys like `loans:read:own`; scope 1 doesn't need both forms.
+
+## Code
+
+The catalog and the role map live in `backend/src/authorization/`: `role.enum.ts`, `permissions.ts` (the `Permissions` const object) and `role-permissions.ts` (`ROLE_PERMISSIONS`). They hold only the implemented subset (see Status), and each module adds its own entries. The const object is the source of truth for both the seed and the guard.
+
+## Tradeoffs
+
+The structure holds up for scope 1, and the permission check costs nothing (a Set lookup, no DB query). Three open fixes are necessary: member self-service moves to `/me` routes, revenue gets its own endpoint, and no user DTO accepts a role. Each is due when its endpoint is built, not now.
+
+### Design choices
+
+| Choice                                          | What we gain                                                                              | What it costs                                                                             |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Catalog and role map in code, not DB tables     | One source of truth for guard, seed and frontend; no sync; no DB query per check          | Changing a role's grants needs a deploy; no custom roles without a redesign               |
+| Grouped const object, not an enum               | Autocomplete by resource; plain strings that match DB and JSON values; derived union type | Each key's value is typed by hand, so it can drift from its group name                    |
+| `Record<Role, …>` map                           | Adding a role fails the build until its grants are decided                                | Hard to see at a glance what a role lacks; the matrix test covers that                    |
+| Admin gets `ALL_PERMISSIONS`                    | New keys reach Admin with no edit                                                         | A grant nobody reviews; a future key that Admin must not have needs an explicit list      |
+| Full matrix designed now, keys added per module | The matrix is reviewed once, and the code never holds keys that guard nothing             | This doc and the code differ until every module is built; the Status table tracks the gap |
+| Ownership as a service policy, not `:own` keys  | Fewer keys; one meaning per key for staff                                                 | The same key means "any" for staff and "own" for members, which is the main risk below    |
+
+### Risks and what is necessary
+
+| Risk                                                                                           | Fix                                                                                                                                        | Necessary?                                   | Status                                     |
+| ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------- | ------------------------------------------ |
+| A Member key like `loans:read` gets used on a staff route, and members read everyone's records | Serve member self-service from `/me` routes that scope by the token's user. Member then keeps only `books:read`, and every key means "any" | Yes, before the first member-facing endpoint | Open; the matrix still lists 9 Member keys |
+| Revenue leaks to Librarians through a shared dashboard response                                | Serve revenue from its own endpoint guarded by `revenue:read`                                                                              | Yes, when the dashboard endpoint is built    | Open                                       |
+| `users:update` changes a role and bypasses `roles:assign`                                      | Leave `role` out of every user DTO; change roles only through the role endpoint                                                            | Yes, when user endpoints are built           | Open                                       |
+| A key value doesn't match its group (`Books.Read = 'book:read'`)                               | Spec checks that every key starts with its group name                                                                                      | Yes                                          | Done                                       |
+| A key is listed twice, or Admin silently loses keys                                            | Spec checks for duplicates and that Admin equals the full catalog                                                                          | Yes                                          | Done                                       |
+| `members:update` covers both contact edits and suspension                                      | Split out `members:suspend` if Librarians shouldn't suspend                                                                                | No, decide with the Members feature          | Open                                       |
+| `stock:create` doesn't say what it does                                                        | Rename it `stock:report`                                                                                                                   | No, but cheaper before the frontend uses it  | Open                                       |
+| A linear scan on every check                                                                   | Set per role, built once at startup                                                                                                        | No, at 40 keys it's negligible               | Done                                       |
+
+## Out of scope and open questions
+
+Scope 1 has no custom roles, no per-user grants and no wildcard keys. Membership type (Basic, Standard, Premium) sets loan limits and fees, not permissions.
+
+- [ ] Does a member added by staff (Add New Member) get a login, an email invite, or only a record? This decides whether every member has a `users` row.
+- [ ] Register always creates `Role.Member`. Confirm the API ignores any `role` in the request body and that only `roles:assign` changes a role.
+- [ ] The Reorder button on Stock Management needs `acquisitions:create`, which Librarians lack. Hide it for them, or add a request-approval step?
+- [ ] Should Librarians waive small fines, for example below a set amount? That would be a policy on `fines:waive`, not a new key.
+- [ ] Is Inbox a real email integration or in-app messages? If it is email, `messages` may move to a later scope.
+- [ ] Settings, staff users and role management have no screens yet. Their permissions are designed now and are added to the code with their modules (`users` keys are already in).

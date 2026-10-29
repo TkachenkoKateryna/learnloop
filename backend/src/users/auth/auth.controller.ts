@@ -7,7 +7,6 @@ import {
   NotFoundException,
   Post,
   Req,
-  Request,
   Res,
   SerializeOptions,
   UseInterceptors,
@@ -19,7 +18,9 @@ import { AuthService } from './auth.service';
 import { UserService } from '../user.service';
 import { LoginThrottle } from './login-throttle';
 
-import { Public } from '../decorators/public.decorator';
+import { Public } from '../../authorization/public.decorator';
+import { Authenticated } from '../../authorization/authenticated.decorator';
+import { CurrentUser } from '../decorators/current-user.decorator';
 
 import { User } from '../entities/user.entity';
 import { CreateUserDto } from '../dto/create-user.dto';
@@ -27,7 +28,8 @@ import { LoginDto } from '../dto/login.dto';
 import { ForgotPasswordDto } from '../dto/forgot-password.dto';
 import { ResetPasswordDto } from '../dto/reset-password.dto';
 import { LoginResponse } from '../dto/login.response';
-import { type AuthRequest } from '../interfaces/auth.request';
+import { ProfileResponse } from '../dto/profile.response';
+import { type RequestUser } from '../interfaces/auth.request';
 import { type RefreshTokenRequest } from '../interfaces/refresh-token';
 
 @Controller('auth')
@@ -119,11 +121,14 @@ export class AuthController {
   }
 
   @Get('/profile')
-  async profile(@Request() request: AuthRequest): Promise<User> {
-    const user = await this.userService.findOne(request.user.sub);
+  @Authenticated()
+  async profile(
+    @CurrentUser() currentUser: RequestUser,
+  ): Promise<ProfileResponse> {
+    const user = await this.userService.findOne(currentUser.sub);
 
     if (user) {
-      return user;
+      return new ProfileResponse(user);
     }
 
     throw new NotFoundException();

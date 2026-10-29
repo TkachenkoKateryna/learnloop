@@ -1,10 +1,14 @@
-import { Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import { createHash } from 'crypto';
 import { DataSource, EntityManager } from 'typeorm';
-import { AuthService } from './auth.service';
+import { AuthService, LAST_ADMIN_MESSAGE } from './auth.service';
 import { UserService } from '../user.service';
 import { SessionService } from '../session/session.service';
 import { PasswordService } from '../password/password.service';
@@ -12,6 +16,7 @@ import { PasswordResetService } from '../password-reset/password-reset.service';
 import { MailService } from '../../mail/mail.service';
 import { Session } from '../entities/session.entity';
 import { User } from '../entities/user.entity';
+import { Role } from '../../authorization/role.enum';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -57,6 +62,8 @@ describe('AuthService', () => {
       Promise<void>,
       [string, string, EntityManager?]
     >;
+    updateRole: jest.Mock<Promise<void>, [string, Role, EntityManager?]>;
+    lockAdminIds: jest.Mock<Promise<string[]>, [EntityManager]>;
   };
   let sessionService: {
     create: jest.Mock;
@@ -104,6 +111,12 @@ describe('AuthService', () => {
         Promise<void>,
         [string, string, EntityManager?]
       >(() => Promise.resolve()),
+      updateRole: jest.fn<Promise<void>, [string, Role, EntityManager?]>(() =>
+        Promise.resolve(),
+      ),
+      lockAdminIds: jest.fn<Promise<string[]>, [EntityManager]>(() =>
+        Promise.resolve([]),
+      ),
     };
 
     sessionService = {
@@ -383,6 +396,96 @@ describe('AuthService', () => {
 
       expect(userService.updatePasswordHash).not.toHaveBeenCalled();
       expect(sessionService.revokeAllForUser).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('changeRole', () => {
+    const member = { id: 'user-1', role: Role.Member } as User;
+
+    it('updates the role and revokes every session in one transaction', async () => {
+      const { refreshToken } = await service.login(credentials);
+
+      await expect(service.changeRole(member, Role.Librarian)).resolves.toBe(
+        true,
+      );
+
+      expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+      expect(userService.updateRole).toHaveBeenCalledWith(
+        'user-1',
+        Role.Librarian,
+        transactionManager,
+      );
+      expect(sessionService.revokeAllForUser).toHaveBeenCalledWith(
+        'user-1',
+        transactionManager,
+      );
+      await expect(service.refresh(refreshToken)).rejects.toThrow(
+        UnauthorizedException,
+      );
+    });
+
+    it('leaves the user signed in when the role is unchanged', async () => {
+      await expect(service.changeRole(member, Role.Member)).resolves.toBe(
+        false,
+      );
+
+      expect(dataSource.transaction).not.toHaveBeenCalled();
+      expect(userService.updateRole).not.toHaveBeenCalled();
+      expect(sessionService.revokeAllForUser).not.toHaveBeenCalled();
+    });
+
+    describe('last admin', () => {
+      const admin = { id: 'admin-1', role: Role.Admin } as User;
+
+      it('refuses to demote the only admin and changes nothing', async () => {
+        userService.lockAdminIds.mockResolvedValue(['admin-1']);
+
+        await expect(service.changeRole(admin, Role.Librarian)).rejects.toThrow(
+          new ConflictException(LAST_ADMIN_MESSAGE),
+        );
+
+        expect(userService.lockAdminIds).toHaveBeenCalledWith(
+          transactionManager,
+        );
+        expect(userService.updateRole).not.toHaveBeenCalled();
+        expect(sessionService.revokeAllForUser).not.toHaveBeenCalled();
+      });
+
+      it('demotes an admin when another admin remains', async () => {
+        userService.lockAdminIds.mockResolvedValue(['admin-1', 'admin-2']);
+
+        await expect(service.changeRole(admin, Role.Member)).resolves.toBe(
+          true,
+        );
+
+        expect(userService.updateRole).toHaveBeenCalledWith(
+          'admin-1',
+          Role.Member,
+          transactionManager,
+        );
+      });
+
+      it('checks the locked rows, not the role passed in', async () => {
+        const stale = { id: 'admin-1', role: Role.Member } as User;
+        userService.lockAdminIds.mockResolvedValue(['admin-1']);
+
+        await expect(service.changeRole(stale, Role.Librarian)).rejects.toThrow(
+          ConflictException,
+        );
+      });
+
+      it('promotes to admin without locking the admins', async () => {
+        await expect(service.changeRole(member, Role.Admin)).resolves.toBe(
+          true,
+        );
+
+        expect(userService.lockAdminIds).not.toHaveBeenCalled();
+        expect(userService.updateRole).toHaveBeenCalledWith(
+          'user-1',
+          Role.Admin,
+          transactionManager,
+        );
+      });
     });
   });
 
