@@ -1,7 +1,7 @@
 import { applyDecorators, SetMetadata } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { minutes, Throttle, ThrottlerOptions } from '@nestjs/throttler';
-import { normalizeEmail } from '../utils/normalize-email';
+import { normalizeEmail } from '../users/utils/normalize-email';
 
 // Caps login attempts per IP across all emails, so one client can't spread
 // password guesses over many accounts. Its 429s carry a suffixed header,

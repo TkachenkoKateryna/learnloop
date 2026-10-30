@@ -3,7 +3,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import cookieParser from 'cookie-parser';
-import { LOGIN_IP_THROTTLER } from './users/auth/login-throttle';
+import { LOGIN_IP_THROTTLER } from './auth/login-throttle';
 import { ConfigType, CorsConfig } from './config/config.types';
 
 async function bootstrap() {

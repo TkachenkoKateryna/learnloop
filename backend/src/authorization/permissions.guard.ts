@@ -11,7 +11,7 @@ import { IS_AUTHENTICATED_KEY } from './authenticated.decorator';
 import { Permission } from './permissions';
 import { hasPermission } from './role-permissions';
 import { IS_PUBLIC_KEY } from './public.decorator';
-import { AuthRequest } from '../users/interfaces/auth.request';
+import { Role } from './role.enum';
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
@@ -24,7 +24,9 @@ export class PermissionsGuard implements CanActivate {
       return true;
     }
 
-    const { user } = context.switchToHttp().getRequest<Partial<AuthRequest>>();
+    const { user } = context
+      .switchToHttp()
+      .getRequest<{ user?: { role: Role } }>();
     if (!user) {
       throw new UnauthorizedException();
     }

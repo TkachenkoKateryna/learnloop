@@ -3,9 +3,8 @@ import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { QueryFailedError } from 'typeorm';
 import { UserService } from './user.service';
-import { PasswordService } from './password/password.service';
 import { User, USER_EMAIL_UNIQUE } from './entities/user.entity';
-import { CreateUserDto } from './dto/create-user.dto';
+import { NewUser } from './interfaces/new-user';
 
 const uniqueViolation = (constraint: string) =>
   new QueryFailedError(
@@ -22,11 +21,11 @@ describe('UserService', () => {
     save: jest.Mock<Promise<User>, [User]>;
   };
 
-  const newUser: CreateUserDto = {
+  const newUser: NewUser = {
     email: 'kate@example.com',
     firstName: 'Kate',
     lastName: 'Doe',
-    password: 'Password1',
+    passwordHash: 'already-hashed',
   };
 
   beforeEach(async () => {
@@ -42,10 +41,6 @@ describe('UserService', () => {
       providers: [
         UserService,
         { provide: getRepositoryToken(User), useValue: userRepository },
-        {
-          provide: PasswordService,
-          useValue: { hash: jest.fn(() => Promise.resolve('hashed')) },
-        },
       ],
     }).compile();
 
@@ -53,12 +48,12 @@ describe('UserService', () => {
   });
 
   describe('createUser', () => {
-    it('saves the user with a hashed password', async () => {
+    it('stores the given password hash without re-hashing it', async () => {
       const user = await service.createUser(newUser);
 
       expect(user).toMatchObject({ id: 'user-1', email: newUser.email });
       expect(userRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({ password: 'hashed' }),
+        expect.objectContaining({ password: 'already-hashed' }),
       );
     });
 

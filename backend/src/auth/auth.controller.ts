@@ -15,22 +15,22 @@ import type { Response } from 'express';
 import { hours, minutes, Throttle } from '@nestjs/throttler';
 
 import { AuthService } from './auth.service';
-import { UserService } from '../user.service';
+import { UserService } from '../users/user.service';
 import { LoginThrottle } from './login-throttle';
 
-import { Public } from '../../authorization/public.decorator';
-import { Authenticated } from '../../authorization/authenticated.decorator';
-import { CurrentUser } from '../decorators/current-user.decorator';
+import { Public } from '../authorization/public.decorator';
+import { Authenticated } from '../authorization/authenticated.decorator';
+import { CurrentUser } from './decorators/current-user.decorator';
 
-import { User } from '../entities/user.entity';
-import { CreateUserDto } from '../dto/create-user.dto';
-import { LoginDto } from '../dto/login.dto';
-import { ForgotPasswordDto } from '../dto/forgot-password.dto';
-import { ResetPasswordDto } from '../dto/reset-password.dto';
-import { LoginResponse } from '../dto/login.response';
-import { ProfileResponse } from '../dto/profile.response';
-import { type RequestUser } from '../interfaces/auth.request';
-import { type RefreshTokenRequest } from '../interfaces/refresh-token';
+import { User } from '../users/entities/user.entity';
+import { CreateUserDto } from '../users/dto/create-user.dto';
+import { LoginDto } from './dto/login.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { LoginResponse } from './dto/login.response';
+import { ProfileResponse } from '../users/dto/profile.response';
+import { type RequestUser } from './interfaces/auth.request';
+import { type RefreshTokenRequest } from './interfaces/refresh-token';
 
 @Controller('auth')
 @UseInterceptors(ClassSerializerInterceptor)
