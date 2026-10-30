@@ -15,15 +15,11 @@ import { throttleConfig } from './config/throttle.config';
 import { corsConfig } from './config/cors.config';
 import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { BooksModule } from './books/books.module';
-import { Book } from './books/entities/book.entity';
 import { UsersModule } from './users/users.module';
+import { AuthModule } from './auth/auth.module';
 import { PublishersModule } from './publishers/publishers.module';
-import { User } from './users/entities/user.entity';
-import { Session } from './users/entities/session.entity';
-import { PasswordResetToken } from './users/entities/password-reset-token.entity';
-import { Publisher } from './publishers/entities/publisher.entity';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
-import { loginIpThrottler } from './users/auth/login-throttle';
+import { loginIpThrottler } from './auth/login-throttle';
 
 @Module({
   imports: [
@@ -58,11 +54,12 @@ import { loginIpThrottler } from './users/auth/login-throttle';
       inject: [ConfigService],
       useFactory: (configService: ConfigService<ConfigType>) => ({
         ...configService.get<TypeOrmModuleOptions>('database'),
-        entities: [Book, User, Publisher, Session, PasswordResetToken],
+        autoLoadEntities: true,
       }),
     }),
     BooksModule,
     UsersModule,
+    AuthModule,
     PublishersModule,
   ],
   controllers: [AppController],

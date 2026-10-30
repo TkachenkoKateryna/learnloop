@@ -1,8 +1,8 @@
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { CreateUserDto } from '../dto/create-user.dto';
-import { LoginDto } from '../dto/login.dto';
-import { ForgotPasswordDto } from '../dto/forgot-password.dto';
+import { LoginDto } from '../../auth/dto/login.dto';
+import { ForgotPasswordDto } from '../../auth/dto/forgot-password.dto';
 
 describe('NormalizeEmail', () => {
   it.each([

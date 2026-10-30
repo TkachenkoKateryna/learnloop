@@ -5,12 +5,9 @@ import {
   CreateDateColumn,
   Entity,
   Index,
-  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Session } from './session.entity';
-import { PasswordResetToken } from './password-reset-token.entity';
 import { Role } from '../../authorization/role.enum';
 
 export const USER_EMAIL_UNIQUE = 'UQ_user_email';
@@ -53,10 +50,4 @@ export class User {
   @UpdateDateColumn({ type: 'timestamptz' })
   @Expose()
   updatedAt: Date;
-
-  @OneToMany(() => Session, (session) => session.user)
-  sessions: Session[];
-
-  @OneToMany(() => PasswordResetToken, (token) => token.user)
-  passwordResetTokens: PasswordResetToken[];
 }

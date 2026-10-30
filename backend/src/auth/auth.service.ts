@@ -9,18 +9,18 @@ import ms, { StringValue } from 'ms';
 import { DataSource } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { UserService } from '../user.service';
-import { CreateUserDto } from '../dto/create-user.dto';
-import { User } from '../entities/user.entity';
-import { PasswordService } from '../password/password.service';
-import { AuthConfig, ConfigType } from '../../config/config.types';
-import { SessionService } from '../session/session.service';
-import { PasswordResetService } from '../password-reset/password-reset.service';
-import { MailService } from '../../mail/mail.service';
-import { LoginDto } from '../dto/login.dto';
-import { RefreshTokenLifetime } from '../interfaces/refresh-token';
-import { JWTPayload } from '../interfaces/jwt-payload';
-import { Role } from '../../authorization/role.enum';
+import { UserService } from '../users/user.service';
+import { CreateUserDto } from '../users/dto/create-user.dto';
+import { User } from '../users/entities/user.entity';
+import { PasswordService } from './password/password.service';
+import { AuthConfig, ConfigType } from '../config/config.types';
+import { SessionService } from './session/session.service';
+import { PasswordResetService } from './password-reset/password-reset.service';
+import { MailService } from '../mail/mail.service';
+import { LoginDto } from './dto/login.dto';
+import { RefreshTokenLifetime } from './interfaces/refresh-token';
+import { JWTPayload } from './interfaces/jwt-payload';
+import { Role } from '../authorization/role.enum';
 
 export const LAST_ADMIN_MESSAGE = 'Cannot remove the last admin';
 
@@ -52,7 +52,9 @@ export class AuthService {
   }
 
   public async register(createUserDto: CreateUserDto): Promise<User> {
-    return this.userService.createUser(createUserDto);
+    const password = await this.passwordService.hash(createUserDto.password);
+
+    return this.userService.createUser({ ...createUserDto, password });
   }
 
   public async login({

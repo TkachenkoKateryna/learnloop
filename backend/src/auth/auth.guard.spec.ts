@@ -4,10 +4,10 @@ import { JwtService } from '@nestjs/jwt';
 import { Reflector } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthGuard } from './auth.guard';
-import { SessionService } from '../session/session.service';
-import { Session } from '../entities/session.entity';
-import { User } from '../entities/user.entity';
-import { Role } from '../../authorization/role.enum';
+import { SessionService } from './session/session.service';
+import { Session } from './entities/session.entity';
+import { User } from '../users/entities/user.entity';
+import { Role } from '../authorization/role.enum';
 
 interface MockRequest {
   headers: { authorization?: string };

@@ -35,9 +35,7 @@ export class Book {
   @Column()
   publisherId: string;
 
-  @ManyToOne(() => Publisher, (publisher) => publisher.books, {
-    nullable: false,
-  })
+  @ManyToOne(() => Publisher, { nullable: false })
   @JoinColumn({ name: 'publisherId' })
   publisher: Publisher;
 }

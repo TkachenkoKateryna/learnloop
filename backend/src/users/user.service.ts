@@ -1,7 +1,6 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User, USER_EMAIL_UNIQUE } from './entities/user.entity';
-import { PasswordService } from './password/password.service';
 import { EntityManager, Repository } from 'typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
 import {
@@ -16,26 +15,19 @@ const EMAIL_TAKEN_MESSAGE = 'Email already exists';
 export class UserService {
   constructor(
     @InjectRepository(User) private readonly userRepository: Repository<User>,
-    private readonly passwordService: PasswordService,
   ) {}
 
   public async findOneByEmail(email: string): Promise<User | null> {
     return await this.userRepository.findOneBy({ email });
   }
 
+  // createUserDto.password must already be hashed; it is stored as given.
   public async createUser(createUserDto: CreateUserDto): Promise<User> {
     if (await this.findOneByEmail(createUserDto.email)) {
       throw new ConflictException(EMAIL_TAKEN_MESSAGE);
     }
 
-    const hashedPassword = await this.passwordService.hash(
-      createUserDto.password,
-    );
-
-    const user = this.userRepository.create({
-      ...createUserDto,
-      password: hashedPassword,
-    });
+    const user = this.userRepository.create(createUserDto);
 
     try {
       return await this.userRepository.save(user);

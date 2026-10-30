@@ -1,9 +1,9 @@
 import { ConflictException, Logger } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
-import { SessionService } from '../src/users/session/session.service';
+import { SessionService } from '../src/auth/session/session.service';
 import { UserService } from '../src/users/user.service';
-import { AuthService } from '../src/users/auth/auth.service';
+import { AuthService } from '../src/auth/auth.service';
 import { Role } from '../src/authorization/role.enum';
 import { Book } from '../src/books/entities/book.entity';
 import { BookLanguage } from '../src/books/enums/book-language.enum';

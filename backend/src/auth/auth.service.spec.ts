@@ -9,14 +9,15 @@ import { Test } from '@nestjs/testing';
 import { createHash } from 'crypto';
 import { DataSource, EntityManager } from 'typeorm';
 import { AuthService, LAST_ADMIN_MESSAGE } from './auth.service';
-import { UserService } from '../user.service';
-import { SessionService } from '../session/session.service';
-import { PasswordService } from '../password/password.service';
-import { PasswordResetService } from '../password-reset/password-reset.service';
-import { MailService } from '../../mail/mail.service';
-import { Session } from '../entities/session.entity';
-import { User } from '../entities/user.entity';
-import { Role } from '../../authorization/role.enum';
+import { UserService } from '../users/user.service';
+import { SessionService } from './session/session.service';
+import { PasswordService } from './password/password.service';
+import { PasswordResetService } from './password-reset/password-reset.service';
+import { MailService } from '../mail/mail.service';
+import { Session } from './entities/session.entity';
+import { User } from '../users/entities/user.entity';
+import { CreateUserDto } from '../users/dto/create-user.dto';
+import { Role } from '../authorization/role.enum';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -56,6 +57,7 @@ describe('AuthService', () => {
     sendPasswordResetEmail: jest.Mock<Promise<void>, [string, string]>;
   };
   let userService: {
+    createUser: jest.Mock<Promise<User>, [CreateUserDto]>;
     findOneByEmail: jest.Mock<Promise<User | null>, [string]>;
     findOne: jest.Mock<Promise<User | null>, [string]>;
     updatePasswordHash: jest.Mock<
@@ -101,6 +103,9 @@ describe('AuthService', () => {
     } as User;
 
     userService = {
+      createUser: jest.fn((data: CreateUserDto) =>
+        Promise.resolve({ ...data, id: 'user-2' } as User),
+      ),
       findOneByEmail: jest.fn((email: string) =>
         Promise.resolve(email === user.email ? user : null),
       ),
@@ -194,6 +199,26 @@ describe('AuthService', () => {
     }).compile();
 
     service = module.get(AuthService);
+  });
+
+  describe('register', () => {
+    it('creates the user with a hash of the password, never the password itself', async () => {
+      const newUser: CreateUserDto = {
+        email: 'new@example.com',
+        firstName: 'New',
+        lastName: 'User',
+        password: 'Password1',
+      };
+
+      await service.register(newUser);
+
+      const [saved] = userService.createUser.mock.calls[0];
+      expect(saved).toMatchObject({ email: newUser.email });
+      expect(saved.password).not.toBe(newUser.password);
+      await expect(
+        new PasswordService().verify(newUser.password, saved.password),
+      ).resolves.toBe(true);
+    });
   });
 
   describe('login', () => {

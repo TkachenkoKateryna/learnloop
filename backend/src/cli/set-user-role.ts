@@ -2,7 +2,7 @@ import { ConflictException } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../app.module';
 import { Role } from '../authorization/role.enum';
-import { AuthService } from '../users/auth/auth.service';
+import { AuthService } from '../auth/auth.service';
 import { UserService } from '../users/user.service';
 import { normalizeEmail } from '../users/utils/normalize-email';
 

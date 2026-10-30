@@ -1,3 +1,4 @@
+import { Expose } from 'class-transformer';
 import {
   Column,
   CreateDateColumn,
@@ -7,33 +8,36 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { User } from './user.entity';
+import { User } from '../../users/entities/user.entity';
 
 @Entity()
-export class PasswordResetToken {
+export class Session {
   @PrimaryGeneratedColumn('uuid')
+  @Expose()
   id: string;
 
   @Index({ unique: true })
   @Column()
-  tokenHash: string;
+  refreshTokenHash: string;
 
   @Column({ type: 'timestamptz' })
   expiresAt: Date;
 
   @CreateDateColumn({ type: 'timestamptz' })
+  @Expose()
   createdAt: Date;
 
   @Column({ type: 'timestamptz', nullable: true, default: null })
-  usedAt: Date | null;
+  revokedAt: Date | null;
+
+  @Column({ default: false })
+  rememberMe: boolean;
 
   @Index()
   @Column()
   userId: string;
 
-  @ManyToOne(() => User, {
-    nullable: false,
-  })
+  @ManyToOne(() => User, { nullable: false })
   @JoinColumn({ name: 'userId' })
   user: User;
 }
