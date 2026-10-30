@@ -51,10 +51,13 @@ export class AuthService {
     this.passwordResetConfig = authConfig.passwordReset;
   }
 
-  public async register(createUserDto: CreateUserDto): Promise<User> {
-    const password = await this.passwordService.hash(createUserDto.password);
+  public async register({
+    password,
+    ...profile
+  }: CreateUserDto): Promise<User> {
+    const passwordHash = await this.passwordService.hash(password);
 
-    return this.userService.createUser({ ...createUserDto, password });
+    return this.userService.createUser({ ...profile, passwordHash });
   }
 
   public async login({
