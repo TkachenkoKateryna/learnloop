@@ -4,7 +4,6 @@ import { AppModule } from '../app.module';
 import { Role } from '../authorization/role.enum';
 import { AuthService } from '../auth/auth.service';
 import { UserService } from '../users/user.service';
-import { normalizeEmail } from '../users/utils/normalize-email';
 
 const ROLES = Object.values(Role);
 const USAGE = `Usage: npm run user:set-role -- <email> <${ROLES.join('|')}>`;
@@ -26,9 +25,7 @@ async function main(): Promise<void> {
   });
 
   try {
-    const user = await app
-      .get(UserService)
-      .findOneByEmail(normalizeEmail(email));
+    const user = await app.get(UserService).findOneByEmail(email);
 
     if (!user) {
       console.error(`No user with email ${email}`);

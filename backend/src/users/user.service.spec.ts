@@ -1,22 +1,17 @@
 import { ConflictException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { QueryFailedError } from 'typeorm';
 import { UserService } from './user.service';
 import { User, USER_EMAIL_UNIQUE } from './entities/user.entity';
 import { NewUser } from './interfaces/new-user';
+import { postgresQueryError } from '../database/postgres-errors.testing';
 
 const uniqueViolation = (constraint: string) =>
-  new QueryFailedError(
-    'INSERT',
-    [],
-    Object.assign(new Error('duplicate key'), { code: '23505', constraint }),
-  );
+  postgresQueryError({ code: '23505', constraint });
 
 describe('UserService', () => {
   let service: UserService;
   let userRepository: {
-    findOneBy: jest.Mock<Promise<User | null>, [Partial<User>]>;
     create: jest.Mock<User, [Partial<User>]>;
     save: jest.Mock<Promise<User>, [User]>;
   };
@@ -30,9 +25,6 @@ describe('UserService', () => {
 
   beforeEach(async () => {
     userRepository = {
-      findOneBy: jest.fn<Promise<User | null>, [Partial<User>]>(() =>
-        Promise.resolve(null),
-      ),
       create: jest.fn((data: Partial<User>) => data as User),
       save: jest.fn((user: User) => Promise.resolve({ ...user, id: 'user-1' })),
     };
@@ -57,16 +49,15 @@ describe('UserService', () => {
       );
     });
 
-    it('rejects an email that is already registered, without saving', async () => {
-      userRepository.findOneBy.mockResolvedValue({ id: 'existing' } as User);
+    it('stores the email trimmed and lowercased', async () => {
+      await service.createUser({ ...newUser, email: ' Kate@Example.COM ' });
 
-      await expect(service.createUser(newUser)).rejects.toThrow(
-        ConflictException,
+      expect(userRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ email: 'kate@example.com' }),
       );
-      expect(userRepository.save).not.toHaveBeenCalled();
     });
 
-    it('reports a parallel signup that hits the email constraint as a conflict', async () => {
+    it('reports a taken email that hits the constraint as a conflict', async () => {
       userRepository.save.mockRejectedValue(uniqueViolation(USER_EMAIL_UNIQUE));
 
       await expect(service.createUser(newUser)).rejects.toThrow(

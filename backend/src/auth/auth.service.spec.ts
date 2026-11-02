@@ -202,6 +202,8 @@ describe('AuthService', () => {
     service = module.get(AuthService);
   });
 
+  afterEach(() => jest.restoreAllMocks());
+
   describe('register', () => {
     it('creates the user with a hash of the password, never the password itself', async () => {
       const registration: CreateUserDto = {
@@ -220,6 +222,21 @@ describe('AuthService', () => {
       await expect(
         new PasswordService().verify(registration.password, saved.passwordHash),
       ).resolves.toBe(true);
+    });
+
+    it('rejects a taken email before spending time on hashing', async () => {
+      const hash = jest.spyOn(PasswordService.prototype, 'hash');
+
+      await expect(
+        service.register({
+          email: credentials.email,
+          firstName: 'Taken',
+          lastName: 'Email',
+          password: 'Password1',
+        }),
+      ).rejects.toThrow(ConflictException);
+      expect(hash).not.toHaveBeenCalled();
+      expect(userService.createUser).not.toHaveBeenCalled();
     });
   });
 
@@ -368,7 +385,6 @@ describe('AuthService', () => {
         'Failed to send password reset email',
         expect.any(Error),
       );
-      logError.mockRestore();
     });
   });
 
