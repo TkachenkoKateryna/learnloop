@@ -20,6 +20,9 @@ import { AuthModule } from './auth/auth.module';
 import { PublishersModule } from './publishers/publishers.module';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { loginIpThrottler } from './auth/login-throttle';
+import { schemaOptions } from './database/schema-options';
+import { migrationOptions } from './database/migration-options';
+import { PendingMigrationsCheck } from './database/pending-migrations.check';
 
 @Module({
   imports: [
@@ -54,6 +57,8 @@ import { loginIpThrottler } from './auth/login-throttle';
       inject: [ConfigService],
       useFactory: (configService: ConfigService<ConfigType>) => ({
         ...configService.get<TypeOrmModuleOptions>('database'),
+        ...schemaOptions,
+        ...migrationOptions,
         autoLoadEntities: true,
       }),
     }),
@@ -63,6 +68,10 @@ import { loginIpThrottler } from './auth/login-throttle';
     PublishersModule,
   ],
   controllers: [AppController],
-  providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [
+    AppService,
+    PendingMigrationsCheck,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
 })
 export class AppModule {}

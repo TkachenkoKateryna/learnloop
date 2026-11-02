@@ -1,4 +1,5 @@
 import { ConflictException, Logger } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { SessionService } from '../src/auth/session/session.service';
@@ -392,6 +393,51 @@ describe('AppController (e2e)', () => {
       await send('post', '/books', accessToken).expect(201);
       const profile = await getProfile(accessToken).expect(200);
       expect(profile.body).toMatchObject({ role: Role.Librarian });
+    });
+
+    it.each(['9780306406157', '978-0-306-40615-7', '0-306-40615-2'])(
+      'rejects %s as a duplicate of the existing ISBN with 409',
+      async (isbn) => {
+        const accessToken = await loginAs(Role.Admin);
+
+        await request(testSetup.app.getHttpServer())
+          .post('/books')
+          .set('Authorization', `Bearer ${accessToken}`)
+          .send({ ...newBook(), isbn })
+          .expect(409);
+      },
+    );
+
+    it('stores a hyphenated ISBN-10 as 13 digits', async () => {
+      const accessToken = await loginAs(Role.Admin);
+
+      const response = await request(testSetup.app.getHttpServer())
+        .post('/books')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ ...newBook(), isbn: '0-8044-2957-X' })
+        .expect(201);
+
+      expect(response.body).toMatchObject({ isbn: '9780804429573' });
+    });
+
+    it('rejects an ISBN-10 with a wrong check digit with 400', async () => {
+      const accessToken = await loginAs(Role.Admin);
+
+      await request(testSetup.app.getHttpServer())
+        .post('/books')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ ...newBook(), isbn: '0-306-40615-3' })
+        .expect(400);
+    });
+
+    it('rejects a publisher that does not exist with 400', async () => {
+      const accessToken = await loginAs(Role.Admin);
+
+      await request(testSetup.app.getHttpServer())
+        .post('/books')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ ...newBook(), publisherId: randomUUID() })
+        .expect(400);
     });
 
     it('rejects an id that is not a UUID with 400', async () => {

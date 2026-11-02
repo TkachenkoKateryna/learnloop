@@ -1,4 +1,6 @@
 export const testConfig = {
+  // Rebuilt from the migrations on every app start, so the tests run against
+  // the same schema that gets deployed.
   database: {
     type: 'postgres',
     host: 'localhost',
@@ -6,7 +8,8 @@ export const testConfig = {
     username: 'postgres',
     password: 'postgres',
     database: 'learnloop_e2e',
-    synchronize: 1,
+    dropSchema: true,
+    migrationsRun: true,
   },
   auth: {
     jwt: {

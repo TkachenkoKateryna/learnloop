@@ -1,46 +1,49 @@
-import { QueryFailedError } from 'typeorm';
 import { isPostgresError, PostgresErrorCode } from './postgres-errors';
-
-const queryError = (driverError: { code?: string; constraint?: string }) =>
-  new QueryFailedError(
-    'INSERT',
-    [],
-    Object.assign(new Error('query failed'), driverError),
-  );
+import { postgresQueryError } from './postgres-errors.testing';
 
 describe('isPostgresError', () => {
   const { UniqueViolation } = PostgresErrorCode;
 
   it('matches the code and constraint', () => {
-    const error = queryError({ code: '23505', constraint: 'UQ_user_email' });
+    const error = postgresQueryError({
+      code: '23505',
+      constraint: 'uq_users_email',
+    });
 
-    expect(isPostgresError(error, UniqueViolation, 'UQ_user_email')).toBe(true);
+    expect(isPostgresError(error, UniqueViolation, 'uq_users_email')).toBe(
+      true,
+    );
   });
 
   it('matches any constraint when none is given', () => {
-    const error = queryError({ code: '23505', constraint: 'UQ_other' });
+    const error = postgresQueryError({ code: '23505', constraint: 'uq_other' });
 
     expect(isPostgresError(error, UniqueViolation)).toBe(true);
   });
 
   it('does not match a different constraint', () => {
-    const error = queryError({ code: '23505', constraint: 'UQ_other' });
+    const error = postgresQueryError({ code: '23505', constraint: 'uq_other' });
 
-    expect(isPostgresError(error, UniqueViolation, 'UQ_user_email')).toBe(
+    expect(isPostgresError(error, UniqueViolation, 'uq_users_email')).toBe(
       false,
     );
   });
 
   it('does not match a different code on the same constraint', () => {
-    const error = queryError({ code: '23502', constraint: 'UQ_user_email' });
+    const error = postgresQueryError({
+      code: '23502',
+      constraint: 'uq_users_email',
+    });
 
-    expect(isPostgresError(error, UniqueViolation, 'UQ_user_email')).toBe(
+    expect(isPostgresError(error, UniqueViolation, 'uq_users_email')).toBe(
       false,
     );
   });
 
   it('does not match a query error without a code', () => {
-    expect(isPostgresError(queryError({}), UniqueViolation)).toBe(false);
+    expect(isPostgresError(postgresQueryError({}), UniqueViolation)).toBe(
+      false,
+    );
   });
 
   it.each([

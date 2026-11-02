@@ -9,6 +9,7 @@ import {
   MaxLength,
 } from 'class-validator';
 import { BookLanguage } from '../enums/book-language.enum';
+import { NormalizeIsbn } from '../decorators/normalize-isbn.decorator';
 
 export class CreateBookDto {
   @IsNotEmpty()
@@ -16,6 +17,7 @@ export class CreateBookDto {
   @MaxLength(300)
   title: string;
 
+  @NormalizeIsbn()
   @IsNotEmpty()
   @IsISBN()
   isbn: string;
