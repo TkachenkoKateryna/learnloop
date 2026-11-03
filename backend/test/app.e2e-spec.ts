@@ -373,7 +373,9 @@ describe('AppController (e2e)', () => {
 
     it.each<[Method, string]>([
       ['get', '/books'],
+      ['get', '/books/:id'],
       ['post', '/books'],
+      ['patch', '/books/:id'],
       ['delete', '/books/:id'],
     ])(
       'returns 401, not 403, for %s %s without a token',
