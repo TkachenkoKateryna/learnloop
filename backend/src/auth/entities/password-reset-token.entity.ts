@@ -9,12 +9,12 @@ import {
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 
-@Entity()
+@Entity('password_reset_tokens')
 export class PasswordResetToken {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Index({ unique: true })
+  @Index('uq_password_reset_tokens_token_hash', { unique: true })
   @Column()
   tokenHash: string;
 
@@ -31,9 +31,7 @@ export class PasswordResetToken {
   @Column()
   userId: string;
 
-  @ManyToOne(() => User, {
-    nullable: false,
-  })
-  @JoinColumn({ name: 'userId' })
+  @ManyToOne(() => User, { nullable: false, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'user_id' })
   user: User;
 }

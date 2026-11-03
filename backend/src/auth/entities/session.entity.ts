@@ -10,13 +10,13 @@ import {
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 
-@Entity()
+@Entity('sessions')
 export class Session {
   @PrimaryGeneratedColumn('uuid')
   @Expose()
   id: string;
 
-  @Index({ unique: true })
+  @Index('uq_sessions_refresh_token_hash', { unique: true })
   @Column()
   refreshTokenHash: string;
 
@@ -37,7 +37,7 @@ export class Session {
   @Column()
   userId: string;
 
-  @ManyToOne(() => User, { nullable: false })
-  @JoinColumn({ name: 'userId' })
+  @ManyToOne(() => User, { nullable: false, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'user_id' })
   user: User;
 }

@@ -8,8 +8,9 @@ import {
   PostgresErrorCode,
 } from '../database/postgres-errors';
 import { Role } from '../authorization/role.enum';
+import { normalizeEmail } from './utils/normalize-email';
 
-const EMAIL_TAKEN_MESSAGE = 'Email already exists';
+export const EMAIL_TAKEN_MESSAGE = 'Email already exists';
 
 @Injectable()
 export class UserService {
@@ -18,16 +19,14 @@ export class UserService {
   ) {}
 
   public async findOneByEmail(email: string): Promise<User | null> {
-    return await this.userRepository.findOneBy({ email });
+    return await this.userRepository.findOneBy({
+      email: normalizeEmail(email),
+    });
   }
 
   public async createUser(newUser: NewUser): Promise<User> {
-    if (await this.findOneByEmail(newUser.email)) {
-      throw new ConflictException(EMAIL_TAKEN_MESSAGE);
-    }
-
     const user = this.userRepository.create({
-      email: newUser.email,
+      email: normalizeEmail(newUser.email),
       firstName: newUser.firstName,
       lastName: newUser.lastName,
       password: newUser.passwordHash,

@@ -9,17 +9,22 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Role } from '../../authorization/role.enum';
+import { checkName, sqlInList } from '../../database/sql';
 
-export const USER_EMAIL_UNIQUE = 'UQ_user_email';
-export const USER_ROLE_CHECK = 'CHK_user_role';
+const EMAIL_NORMALIZED = `"email" = lower(btrim("email"))`;
+const ROLE_ALLOWED = `"role" IN (${sqlInList(Object.values(Role))})`;
 
-const ROLE_VALUES = Object.values(Role)
-  .map((role) => `'${role}'`)
-  .join(', ');
+export const USER_EMAIL_UNIQUE = 'uq_users_email';
+export const USER_EMAIL_NORMALIZED_CHECK = checkName(
+  'chk_users_email_normalized',
+  EMAIL_NORMALIZED,
+);
+export const USER_ROLE_CHECK = checkName('chk_users_role', ROLE_ALLOWED);
 
-@Entity()
+@Entity('users')
 @Index(USER_EMAIL_UNIQUE, ['email'], { unique: true })
-@Check(USER_ROLE_CHECK, `"role" IN (${ROLE_VALUES})`)
+@Check(USER_EMAIL_NORMALIZED_CHECK, EMAIL_NORMALIZED)
+@Check(USER_ROLE_CHECK, ROLE_ALLOWED)
 export class User {
   @PrimaryGeneratedColumn('uuid')
   @Expose()

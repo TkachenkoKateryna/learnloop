@@ -9,7 +9,7 @@ import ms, { StringValue } from 'ms';
 import { DataSource } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { UserService } from '../users/user.service';
+import { EMAIL_TAKEN_MESSAGE, UserService } from '../users/user.service';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { User } from '../users/entities/user.entity';
 import { PasswordService } from './password/password.service';
@@ -55,6 +55,10 @@ export class AuthService {
     password,
     ...profile
   }: CreateUserDto): Promise<User> {
+    if (await this.userService.findOneByEmail(profile.email)) {
+      throw new ConflictException(EMAIL_TAKEN_MESSAGE);
+    }
+
     const passwordHash = await this.passwordService.hash(password);
 
     return this.userService.createUser({ ...profile, passwordHash });

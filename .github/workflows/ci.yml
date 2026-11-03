@@ -33,6 +33,46 @@ jobs:
       - run: npm run build
       - run: npm test -- --ci
 
+  backend-database:
+    name: Backend database
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: learnloop_e2e
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d learnloop_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DB_NAME: learnloop_e2e
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      # The app validates its env at startup, even in e2e tests; the
+      # example's placeholder values pass that validation.
+      - run: cp .env.example .env
+      - name: Apply migrations to an empty database
+        run: npm run migration:run
+      - name: Check every entity change has a migration
+        run: npm run migration:check
+      - run: npm run test:e2e -- --ci
+
   frontend:
     name: Frontend
     runs-on: ubuntu-latest
