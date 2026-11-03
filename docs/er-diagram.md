@@ -8,8 +8,8 @@
 ## Conventions
 
 - Tables use plural snake_case names (`users`, `book_copies`), so none of them clash with SQL reserved words.
-- Every entity table has a `BIGSERIAL` surrogate key named `id`. Junction tables use a composite primary key made of their two foreign keys.
-- The one exception is `sessions.id`, a `UUID`. The API generates it before the insert, because it signs the session id into the tokens first, and a random id can't be guessed from a token.
+- Every entity table has a `UUID` surrogate key named `id`, with `DEFAULT gen_random_uuid()`. Every foreign key to it is a `UUID` too. Junction tables use a composite primary key made of their two foreign keys.
+- The API may supply the id itself when it needs it before the insert. Sign-in does this for `sessions.id`, because it signs the session id into the tokens first.
 - All points in time are `TIMESTAMPTZ`.
 - Columns without **NN** are optional.
 
@@ -43,7 +43,7 @@ Tables are grouped by area: **catalog** (publishers, books, authors, book_author
 
 | Column       | Type           | Keys   |
 | ------------ | -------------- | ------ |
-| `id`         | `BIGSERIAL`    | PK     |
+| `id`         | `UUID`         | PK     |
 | `name`       | `VARCHAR(255)` | NN, UQ |
 | `created_at` | `TIMESTAMPTZ`  | NN     |
 | `updated_at` | `TIMESTAMPTZ`  | NN     |
@@ -54,8 +54,8 @@ Tables are grouped by area: **catalog** (publishers, books, authors, book_author
 
 | Column             | Type           | Keys   |
 | ------------------ | -------------- | ------ |
-| `id`               | `BIGSERIAL`    | PK     |
-| `publisher_id`     | `BIGINT`       | FK, NN |
+| `id`               | `UUID`         | PK     |
+| `publisher_id`     | `UUID`         | FK, NN |
 | `title`            | `VARCHAR(500)` | NN     |
 | `description`      | `TEXT`         |        |
 | `isbn`             | `VARCHAR(20)`  | UQ     |
@@ -72,7 +72,7 @@ Tables are grouped by area: **catalog** (publishers, books, authors, book_author
 
 | Column       | Type           | Keys |
 | ------------ | -------------- | ---- |
-| `id`         | `BIGSERIAL`    | PK   |
+| `id`         | `UUID`         | PK   |
 | `name`       | `VARCHAR(255)` | NN   |
 | `created_at` | `TIMESTAMPTZ`  | NN   |
 | `updated_at` | `TIMESTAMPTZ`  | NN   |
@@ -83,8 +83,8 @@ Tables are grouped by area: **catalog** (publishers, books, authors, book_author
 
 | Column         | Type       | Keys   |
 | -------------- | ---------- | ------ |
-| `book_id`      | `BIGINT`   | PK, FK |
-| `author_id`    | `BIGINT`   | PK, FK |
+| `book_id`      | `UUID`     | PK, FK |
+| `author_id`    | `UUID`     | PK, FK |
 | `author_order` | `SMALLINT` | NN     |
 
 - `PRIMARY KEY (book_id, author_id)`
@@ -97,8 +97,8 @@ Tables are grouped by area: **catalog** (publishers, books, authors, book_author
 
 | Column              | Type            | Keys   |
 | ------------------- | --------------- | ------ |
-| `id`                | `BIGSERIAL`     | PK     |
-| `book_id`           | `BIGINT`        | FK, NN |
+| `id`                | `UUID`          | PK     |
+| `book_id`           | `UUID`          | FK, NN |
 | `barcode`           | `VARCHAR(50)`   | NN, UQ |
 | `acquired_at`       | `TIMESTAMPTZ`   | NN     |
 | `purchase_price`    | `NUMERIC(10,2)` |        |
@@ -116,9 +116,9 @@ Tables are grouped by area: **catalog** (publishers, books, authors, book_author
 
 | Column         | Type          | Keys   |
 | -------------- | ------------- | ------ |
-| `id`           | `BIGSERIAL`   | PK     |
-| `user_id`      | `BIGINT`      | FK, NN |
-| `book_copy_id` | `BIGINT`      | FK, NN |
+| `id`           | `UUID`        | PK     |
+| `user_id`      | `UUID`        | FK, NN |
+| `book_copy_id` | `UUID`        | FK, NN |
 | `borrowed_at`  | `TIMESTAMPTZ` | NN     |
 | `due_at`       | `TIMESTAMPTZ` | NN     |
 | `returned_at`  | `TIMESTAMPTZ` |        |
@@ -133,7 +133,7 @@ Tables are grouped by area: **catalog** (publishers, books, authors, book_author
 
 | Column          | Type           | Keys   |
 | --------------- | -------------- | ------ |
-| `id`            | `BIGSERIAL`    | PK     |
+| `id`            | `UUID`         | PK     |
 | `first_name`    | `VARCHAR(100)` | NN     |
 | `last_name`     | `VARCHAR(100)` | NN     |
 | `email`         | `VARCHAR(255)` | NN, UQ |
@@ -156,7 +156,7 @@ One row per sign-in. The row backs the refresh token cookie, and every access to
 | Column               | Type          | Keys   |
 | -------------------- | ------------- | ------ |
 | `id`                 | `UUID`        | PK     |
-| `user_id`            | `BIGINT`      | FK, NN |
+| `user_id`            | `UUID`        | FK, NN |
 | `refresh_token_hash` | `CHAR(64)`    | NN, UQ |
 | `remember_me`        | `BOOLEAN`     | NN     |
 | `expires_at`         | `TIMESTAMPTZ` | NN     |
@@ -176,8 +176,8 @@ One row per "forgot password" request.
 
 | Column       | Type          | Keys   |
 | ------------ | ------------- | ------ |
-| `id`         | `BIGSERIAL`   | PK     |
-| `user_id`    | `BIGINT`      | FK, NN |
+| `id`         | `UUID`        | PK     |
+| `user_id`    | `UUID`        | FK, NN |
 | `token_hash` | `CHAR(64)`    | NN, UQ |
 | `expires_at` | `TIMESTAMPTZ` | NN     |
 | `used_at`    | `TIMESTAMPTZ` |        |
