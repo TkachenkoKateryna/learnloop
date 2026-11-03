@@ -191,5 +191,6 @@ A second CI job starts Postgres, applies the migrations to an empty database, ru
 
 ## More documentation
 
+- [Authentication and authorization](../docs/authentication-and-authorization.md): the sign-in, refresh, reset and role-change flows, and the rules they keep.
 - [Roles and permissions](../docs/roles-and-permissions.md): roles, permission keys and the planned resources.
 - [Database design](../docs/er-diagram.md): the target library schema with an ER diagram. It describes where the schema is heading; the migrations define what exists today.
